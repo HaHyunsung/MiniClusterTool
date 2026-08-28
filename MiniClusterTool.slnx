@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/MiniCluster.App/MiniCluster.App.csproj" />
+    <Project Path="src/MiniCluster.Core/MiniCluster.Core.csproj" />
+    <Project Path="src/MiniCluster.Infrastructure/MiniCluster.Infrastructure.csproj" />
+    <Project Path="src/MiniCluster.Simulator/MiniCluster.Simulator.csproj" />
+    <Project Path="src/MiniCluster.Ui/MiniCluster.Ui.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/MiniCluster.Core.Tests/MiniCluster.Core.Tests.csproj" />
+  </Folder>
+</Solution>
