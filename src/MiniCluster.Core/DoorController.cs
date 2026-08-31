@@ -21,7 +21,7 @@ namespace MiniCluster.Core
         // 리뷰 실습용 함수 추가 (3초 설정)
         public int GetTimeoutSeconds()
         {
-            return 3;
+            return 5;
         }
     }
 }
