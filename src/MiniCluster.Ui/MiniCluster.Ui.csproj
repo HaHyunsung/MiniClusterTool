@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\MiniCluster.App\MiniCluster.App.csproj" />
+    <ProjectReference Include="..\MiniCluster.Infrastructure\MiniCluster.Infrastructure.csproj" />
   </ItemGroup>
 
   <PropertyGroup>
