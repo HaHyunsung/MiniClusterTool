@@ -19,8 +19,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Hhs.Automation.Core\Hhs.Automation.Core.csproj" />
-    <ProjectReference Include="..\..\src\MiniCluster.Domain\MiniCluster.Domain.csproj" />
+    <ProjectReference Include="..\..\src\FabStack.Core\FabStack.Core.csproj" />
+    <ProjectReference Include="..\..\src\FabStack.Cluster.Domain\FabStack.Cluster.Domain.csproj" />
   </ItemGroup>
 
 </Project>

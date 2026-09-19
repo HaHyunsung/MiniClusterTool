@@ -1,9 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
-using Hhs.Automation.Core;
+using FabStack.Core;
 
-namespace MiniCluster.Infrastructure
+namespace FabStack.Cluster.Infrastructure
 {
     internal class SystemClock : IClock
     {

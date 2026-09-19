@@ -1,4 +1,4 @@
-﻿namespace Hhs.Automation.Core
+﻿namespace FabStack.Core
 {
     public enum PumpState
     {

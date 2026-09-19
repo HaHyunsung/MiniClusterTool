@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Text;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace MiniCluster.App
+namespace FabStack.Cluster.App
 {
     public static class AppServices
     {

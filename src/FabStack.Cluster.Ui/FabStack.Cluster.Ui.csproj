@@ -1,8 +1,8 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
-    <ProjectReference Include="..\MiniCluster.App\MiniCluster.App.csproj" />
-    <ProjectReference Include="..\MiniCluster.Infrastructure\MiniCluster.Infrastructure.csproj" />
+    <ProjectReference Include="..\FabStack.Cluster.App\FabStack.Cluster.App.csproj" />
+    <ProjectReference Include="..\FabStack.Cluster.Infrastructure\FabStack.Cluster.Infrastructure.csproj" />
   </ItemGroup>
 
   <PropertyGroup>

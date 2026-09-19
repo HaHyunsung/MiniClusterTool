@@ -7,7 +7,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Hhs.Automation.Core\Hhs.Automation.Core.csproj" />
+    <ProjectReference Include="..\FabStack.Core\FabStack.Core.csproj" />
   </ItemGroup>
 
 </Project>
