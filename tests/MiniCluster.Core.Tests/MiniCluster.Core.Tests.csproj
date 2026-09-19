@@ -19,7 +19,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\MiniCluster.Core\MiniCluster.Core.csproj" />
+    <ProjectReference Include="..\..\src\Hhs.Automation.Core\Hhs.Automation.Core.csproj" />
+    <ProjectReference Include="..\..\src\MiniCluster.Domain\MiniCluster.Domain.csproj" />
   </ItemGroup>
 
 </Project>

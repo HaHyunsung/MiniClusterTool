@@ -1,7 +1,8 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/Hhs.Automation.Core/Hhs.Automation.Core.csproj" />
     <Project Path="src/MiniCluster.App/MiniCluster.App.csproj" />
-    <Project Path="src/MiniCluster.Core/MiniCluster.Core.csproj" />
+    <Project Path="src/MiniCluster.Domain/MiniCluster.Domain.csproj" />
     <Project Path="src/MiniCluster.Infrastructure/MiniCluster.Infrastructure.csproj" />
     <Project Path="src/MiniCluster.Simulator/MiniCluster.Simulator.csproj" />
     <Project Path="src/MiniCluster.Ui/MiniCluster.Ui.csproj" />

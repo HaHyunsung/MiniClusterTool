@@ -1,14 +1,13 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
-  <ItemGroup>
-    <ProjectReference Include="..\Hhs.Automation.Core\Hhs.Automation.Core.csproj" />
-    <ProjectReference Include="..\MiniCluster.Domain\MiniCluster.Domain.csproj" />
-  </ItemGroup>
-
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
   </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Hhs.Automation.Core\Hhs.Automation.Core.csproj" />
+  </ItemGroup>
 
 </Project>

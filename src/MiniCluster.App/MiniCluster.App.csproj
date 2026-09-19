@@ -1,7 +1,8 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
-    <ProjectReference Include="..\MiniCluster.Core\MiniCluster.Core.csproj" />
+    <ProjectReference Include="..\Hhs.Automation.Core\Hhs.Automation.Core.csproj" />
+    <ProjectReference Include="..\MiniCluster.Domain\MiniCluster.Domain.csproj" />
   </ItemGroup>
 
   <ItemGroup>
