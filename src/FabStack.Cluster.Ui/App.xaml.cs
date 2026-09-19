@@ -5,9 +5,9 @@ using System.Windows;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Serilog;
-using MiniCluster.App; // <- 이 줄 추가
+using FabStack.Cluster.App; // <- 이 줄 추가
 
-namespace MiniCluster.Ui;
+namespace FabStack.Cluster.Ui;
 
 /// <summary>
 /// Interaction logic for App.xaml

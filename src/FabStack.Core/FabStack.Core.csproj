@@ -4,8 +4,8 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <RootNamespace>Hhs.Automation.Core</RootNamespace>
-    <AssemblyName>Hhs.Automation.Core</AssemblyName>
+    <RootNamespace>FabStack.Core</RootNamespace>
+    <AssemblyName>FabStack.Core</AssemblyName>
   </PropertyGroup>
 
 </Project>

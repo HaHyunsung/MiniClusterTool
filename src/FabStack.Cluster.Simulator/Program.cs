@@ -2,7 +2,7 @@
 using Microsoft.Extensions.Logging;
 using Serilog;
 
-namespace MiniCluster.Simulator;
+namespace FabStack.Cluster.Simulator;
 
 internal class Program
 {

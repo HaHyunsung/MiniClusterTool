@@ -1,13 +1,13 @@
 <Solution>
   <Folder Name="/src/">
-    <Project Path="src/Hhs.Automation.Core/Hhs.Automation.Core.csproj" />
-    <Project Path="src/MiniCluster.App/MiniCluster.App.csproj" />
-    <Project Path="src/MiniCluster.Domain/MiniCluster.Domain.csproj" />
-    <Project Path="src/MiniCluster.Infrastructure/MiniCluster.Infrastructure.csproj" />
-    <Project Path="src/MiniCluster.Simulator/MiniCluster.Simulator.csproj" />
-    <Project Path="src/MiniCluster.Ui/MiniCluster.Ui.csproj" />
+    <Project Path="src/FabStack.Core/FabStack.Core.csproj" />
+    <Project Path="src/FabStack.Cluster.App/FabStack.Cluster.App.csproj" />
+    <Project Path="src/FabStack.Cluster.Domain/FabStack.Cluster.Domain.csproj" />
+    <Project Path="src/FabStack.Cluster.Infrastructure/FabStack.Cluster.Infrastructure.csproj" />
+    <Project Path="src/FabStack.Cluster.Simulator/FabStack.Cluster.Simulator.csproj" />
+    <Project Path="src/FabStack.Cluster.Ui/FabStack.Cluster.Ui.csproj" />
   </Folder>
   <Folder Name="/tests/">
-    <Project Path="tests/MiniCluster.Core.Tests/MiniCluster.Core.Tests.csproj" />
+    <Project Path="tests/FabStack.Core.Tests/FabStack.Core.Tests.csproj" />
   </Folder>
 </Solution>

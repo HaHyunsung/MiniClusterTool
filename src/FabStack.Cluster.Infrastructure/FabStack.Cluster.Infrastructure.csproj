@@ -1,8 +1,8 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
-    <ProjectReference Include="..\Hhs.Automation.Core\Hhs.Automation.Core.csproj" />
-    <ProjectReference Include="..\MiniCluster.Domain\MiniCluster.Domain.csproj" />
+    <ProjectReference Include="..\FabStack.Core\FabStack.Core.csproj" />
+    <ProjectReference Include="..\FabStack.Cluster.Domain\FabStack.Cluster.Domain.csproj" />
   </ItemGroup>
 
   <PropertyGroup>

@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace Hhs.Automation.Core
+namespace FabStack.Core
 {
     public sealed class Permissive
     {

@@ -1,9 +1,9 @@
-﻿using Hhs.Automation.Core;
+﻿using FabStack.Core;
 using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace MiniCluster.Core.Tests
+namespace FabStack.Core.Tests
 {
     public class FakeValve : IValve
     {
