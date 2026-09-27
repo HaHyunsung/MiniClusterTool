@@ -20,5 +20,7 @@
 
         Task<bool> OpenAsync(CancellationToken ct);     // Open 명령 - 반환값으로 수행 가능 여부 반환
         Task<bool> CloseAsync(CancellationToken ct);    // Close 명령 - 반환값으로 수행 가능 여부 반환
+
+        void Reset();
     }
 }
