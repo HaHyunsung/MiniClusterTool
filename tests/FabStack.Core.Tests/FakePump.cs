@@ -43,26 +43,26 @@
         #endregion
 
         #region Methods
-        public Task<bool> RunAsync(CancellationToken ct)
+        public bool Run()
         {
-            if (!RunPermissive.IsAllowed || Error) return Task.FromResult(false);
-            if (State == PumpState.Running || State == PumpState.Starting) return Task.FromResult(true);
+            if (!RunPermissive.IsAllowed || Error) return false;
+            if (State == PumpState.Running || State == PumpState.Starting) return true;
 
             State = PumpState.Starting;
             timer.Tick();
 
-            return Task.FromResult(true);
+            return true;
         }
 
-        public Task<bool> StopAsync(CancellationToken ct)
+        public bool Stop()
         {
-            if (!StopPermissive.IsAllowed || Error) return Task.FromResult(false);
-            if (State == PumpState.Stopped || State == PumpState.Stopping) return Task.FromResult(true);
+            if (!StopPermissive.IsAllowed || Error) return false;
+            if (State == PumpState.Stopped || State == PumpState.Stopping) return true;
 
             State = PumpState.Stopping;
             timer.Tick();
 
-            return Task.FromResult(true);
+            return true;
         }
 
         private void Scan()

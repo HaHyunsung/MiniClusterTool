@@ -18,8 +18,8 @@
         Permissive ClosePermissive { get; } // Close 동작 전 확인하는 허용 여부
         ValveState State { get; }           // 동작 상태
 
-        Task<bool> OpenAsync(CancellationToken ct);     // Open 명령 - 반환값으로 수행 가능 여부 반환
-        Task<bool> CloseAsync(CancellationToken ct);    // Close 명령 - 반환값으로 수행 가능 여부 반환
+        bool Open();     // Open 명령 - 반환값으로 수행 가능 여부 반환
+        bool Close();    // Close 명령 - 반환값으로 수행 가능 여부 반환
 
         void Reset();
     }

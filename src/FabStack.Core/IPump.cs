@@ -18,8 +18,8 @@
         Permissive StopPermissive { get; }  // Stop 동작 전 확인하는 허용 여부
         PumpState State { get; }            // 동작 상태
 
-        Task<bool> RunAsync(CancellationToken ct);      // Run 명령 - 반환값으로 명령 수용 여부 반환
-        Task<bool> StopAsync(CancellationToken ct);     // Stop 명령 - 반환값으로 명령 수용 여부 반환
+        bool Run();      // Run 명령 - 반환값으로 명령 수용 여부 반환
+        bool Stop();     // Stop 명령 - 반환값으로 명령 수용 여부 반환
 
         void Reset();
     }

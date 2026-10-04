@@ -47,26 +47,26 @@ namespace FabStack.Core.Tests
         #endregion
 
         #region Methods
-        public Task<bool> OpenAsync(CancellationToken ct)
+        public bool Open()
         {
-            if (!OpenPermissive.IsAllowed || Error) return Task.FromResult(false);
-            if (State == ValveState.Opened || State == ValveState.Opening) return Task.FromResult(true);
+            if (!OpenPermissive.IsAllowed || Error) return false;
+            if (State == ValveState.Opened || State == ValveState.Opening) return true;
 
             State = ValveState.Opening;
             timer.Tick();          // 명령 시각 기록 (TON의 IN이 켜진 순간)
 
-            return Task.FromResult(true);
+            return true;
         }
 
-        public Task<bool> CloseAsync(CancellationToken ct)
+        public bool Close()
         {
-            if (!ClosePermissive.IsAllowed || Error) return Task.FromResult(false);
-            if (State == ValveState.Closed || State == ValveState.Closing) return Task.FromResult(true);
+            if (!ClosePermissive.IsAllowed || Error) return false;
+            if (State == ValveState.Closed || State == ValveState.Closing) return true;
 
             State = ValveState.Closing;
             timer.Tick();          // 명령 시각 기록 (TON의 IN이 켜진 순간)
 
-            return Task.FromResult(true);
+            return true;
         }
 
         private void Scan()

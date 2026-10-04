@@ -27,18 +27,18 @@ namespace FabStack.Core.Tests
 
         #region Methods
         [Fact]
-        public async Task ValveOpen()
+        public void ValveOpen()
         {
-            await valve.OpenAsync(CancellationToken.None);
+            valve.Open();
             scanCycle.RunScans(TimeSpan.FromMilliseconds(100));
             Assert.Equal(ValveState.Opened, valve.State);
         }
 
         [Fact]
-        public async Task ValveTimeout()
+        public void ValveTimeout()
         {
             valve.RespondsToCommand = false;
-            await valve.OpenAsync(CancellationToken.None);
+            valve.Open();
             scanCycle.RunScans(TimeSpan.FromMilliseconds(1100));
             Assert.Equal(ValveState.Unknown, valve.State);
             Assert.True(valve.Error);
