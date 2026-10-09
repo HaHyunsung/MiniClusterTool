@@ -4,7 +4,7 @@ using System.Text;
 
 namespace FabStack.Core.Tests
 {
-    public class FakeValveTests
+    public class FakeValveTest
     {
         #region Fields
         private readonly FakeValve valve;
@@ -14,7 +14,7 @@ namespace FabStack.Core.Tests
         #endregion
 
         #region Constructor
-        public FakeValveTests()
+        public FakeValveTest()
         {
             clock = new FakeClock();
             scanCycle = new FakeScanCycle(clock, TimeSpan.FromMilliseconds(10));
