@@ -25,9 +25,7 @@
         #region Properties
         public string Name { get; }
 
-        public bool Error { get; private set; }
-
-        public int ErrorID { get; private set; }
+        public Fault? Fault { get; private set; }
 
         // 스케일 변환이 없는 가짜 센서라 RawValue와 Value가 같다
         public double RawValue => Value;
@@ -39,32 +37,24 @@
         #region Methods
         private void Scan()
         {
-            if (Error) return;
+            if (Fault is not null) return;
 
             if (Value < minValid)
-            {
-                Error = true;
-                ErrorID = (int)AnalogSensorErrorCode.UnderRange;
-            }
+                Fault = new Fault(Name, AnalogSensorFault.UnderRange, $"하한 이탈 ({Value} < {minValid})");
             else if (Value > maxValid)
-            {
-                Error = true;
-                ErrorID = (int)AnalogSensorErrorCode.OverRange;
-            }
+                Fault = new Fault(Name, AnalogSensorFault.OverRange, $"상한 이탈 ({Value} > {maxValid})");
         }
 
-        public void Reset()
+        public void ClearFault()
         {
-            Error = false;
-            ErrorID = 0;
+            Fault = null;
         }
         #endregion
     }
 
-    public enum AnalogSensorErrorCode
+    public enum AnalogSensorFault
     {
-        NoError = 0,
-        UnderRange = 1,
-        OverRange = 2
+        UnderRange,
+        OverRange
     }
 }

@@ -41,8 +41,8 @@ namespace FabStack.Core.Tests
             valve.Open();
             scanCycle.RunScans(TimeSpan.FromMilliseconds(1100));
             Assert.Equal(ValveState.Unknown, valve.State);
-            Assert.True(valve.Error);
-            Assert.Equal((int)ValveErrorCode.OpenTimeout, valve.ErrorID);
+            Assert.True(valve.Fault is not null);
+            Assert.Equal(ValveFault.OpenTimeout, valve.Fault.Code);
         }
         #endregion
     }

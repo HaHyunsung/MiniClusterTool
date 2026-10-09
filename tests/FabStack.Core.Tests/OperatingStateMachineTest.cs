@@ -239,7 +239,7 @@ namespace FabStack.Core.Tests
 
             scanCycle.RunScans(TimeSpan.FromMilliseconds(20));
             Assert.True(stateMachine.Error);
-            Assert.Equal((int)OperationErrorCode.AbortingTimeout, stateMachine.ErrorID);
+            Assert.Equal((int)OperationFault.AbortingTimeout, stateMachine.ErrorID);
             Assert.Equal(OperationState.Aborting, stateMachine.State);
         }
 
@@ -301,7 +301,7 @@ namespace FabStack.Core.Tests
 
             scanCycle.RunScans(TimeSpan.FromSeconds(181));
             Assert.True(stateMachine.Error);
-            Assert.Equal((int)OperationErrorCode.HomingTimeout, stateMachine.ErrorID);
+            Assert.Equal((int)OperationFault.HomingTimeout, stateMachine.ErrorID);
 
             homeDone = true;
             scanCycle.RunScans(TimeSpan.FromMilliseconds(20));

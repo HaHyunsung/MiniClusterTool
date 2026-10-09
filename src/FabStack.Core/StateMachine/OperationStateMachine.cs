@@ -6,7 +6,7 @@ using System.Text;
 
 namespace FabStack.Core
 {
-    public class OperationStateMachine
+    public class OperationStateMachine : IFaultSource
     {
         #region Fields
         private readonly ModeSelector mode;
@@ -20,9 +20,6 @@ namespace FabStack.Core
         public string Name { get; }
         public OperationState State { get; private set; } = OperationState.None;
         public bool Resumed { get; private set; }      // PAUSED에서 Run으로 들어왔는가 (TcHit P_Resumed)
-        public bool Error { get; private set; }
-        public int ErrorID { get; private set; }
-
         public Permissive HomePermissive { get; }    // 층 2가 추가 조건 등록 (하위 에러 없음, 하위 전원 ABORTED 등)
         public Permissive RunPermissive { get; }
         public Permissive SemiAutoPermissive { get; }
@@ -36,6 +33,8 @@ namespace FabStack.Core
         public Permissive RunningCondition { get; }    // 충족이면 Running, 아니면 Idle (일감 유무)
 
         public IReadOnlyList<StateTransition> History => history;
+
+        public Fault? Fault { get; private set; }
         #endregion
 
         #region Constructor
@@ -76,7 +75,7 @@ namespace FabStack.Core
         {
             if (State != OperationState.Aborted) return false;
             if (mode.Mode is not (OperationMode.Maint or OperationMode.Auto)) return false;
-            if (Error || !HomePermissive.IsAllowed) return false;
+            if (Fault is not null || !HomePermissive.IsAllowed) return false;
 
             ChangeState(OperationState.Homing, TransitionTrigger.Home);
             return true;
@@ -86,7 +85,7 @@ namespace FabStack.Core
         {
             if (State is not (OperationState.Homed or OperationState.Stopped or OperationState.Paused)) return false;
             if (mode.Mode is not (OperationMode.Auto)) return false;
-            if (Error || !RunPermissive.IsAllowed) return false;
+            if (Fault is not null || !RunPermissive.IsAllowed) return false;
         
             Resumed = State == OperationState.Paused;
             ChangeState(OperationState.Idle, TransitionTrigger.Run);
@@ -115,20 +114,10 @@ namespace FabStack.Core
         {
             if (State is not (OperationState.Homed)) return false;
             if (mode.Mode is not (OperationMode.Maint)) return false;
-            if (Error || !SemiAutoPermissive.IsAllowed) return false;
+            if (Fault is not null || !SemiAutoPermissive.IsAllowed) return false;
 
             ChangeState(OperationState.SemiAuto, TransitionTrigger.SemiAuto);
             return true;
-        }
-
-        public void Reset()
-        {
-            if (Error &&
-                State is OperationState.Aborting or OperationState.Homing or OperationState.Pausing or OperationState.Stopping)
-                timer.Tick();
-
-            Error = false;
-            ErrorID = 0;
         }
 
         private void ChangeState(OperationState next, TransitionTrigger trigger)
@@ -153,13 +142,13 @@ namespace FabStack.Core
                 return;
             }
 
-            (Permissive? condition, OperationState next, TimeSpan? timeout, OperationErrorCode errCode) step = State switch
+            (Permissive? condition, OperationState next, TimeSpan? timeout, OperationFault fault) step = State switch
             {
-                OperationState.Aborting => (AbortedCondition, OperationState.Aborted, timeouts.Aborting, OperationErrorCode.AbortingTimeout),
-                OperationState.Homing => (HomedCondition, OperationState.Homed, timeouts.Homing, OperationErrorCode.HomingTimeout),
-                OperationState.Pausing => (PausedCondition, OperationState.Paused, timeouts.Pausing, OperationErrorCode.PausingTimeout),
-                OperationState.Stopping => (StoppedCondition, OperationState.Stopped, timeouts.Stopping, OperationErrorCode.StoppingTimeout),
-                _ => (null, State, null, OperationErrorCode.None)
+                OperationState.Aborting => (AbortedCondition, OperationState.Aborted, timeouts.Aborting, OperationFault.AbortingTimeout),
+                OperationState.Homing => (HomedCondition, OperationState.Homed, timeouts.Homing, OperationFault.HomingTimeout),
+                OperationState.Pausing => (PausedCondition, OperationState.Paused, timeouts.Pausing, OperationFault.PausingTimeout),
+                OperationState.Stopping => (StoppedCondition, OperationState.Stopped, timeouts.Stopping, OperationFault.StoppingTimeout),
+                __ => (null, State, null, null)
             };
 
             if (step.condition is null) return;
@@ -170,14 +159,22 @@ namespace FabStack.Core
             }
 
             if (step.timeout is null) return;      // 감시 안 하는 전이
-            else if(timer.ElapsedTime() >= step.timeout && !Error)
+            else if(timer.ElapsedTime() >= step.timeout && Fault is null)
             {
-                Error = true;
-                ErrorID = (int)step.errCode;
+                Fault = new Fault(Name, step.fault, $"상태 변경 시간 초과: {step.condition.BlockedReasonsText}");
                 return;
             }
         }
 
-    #endregion
+        public void ClearFault()
+        {
+            if (Fault is not null &&
+                State is OperationState.Aborting or OperationState.Homing or OperationState.Pausing or OperationState.Stopping)
+                timer.Tick();
+
+            Fault = null;
+        }
+
+        #endregion
     }
 }

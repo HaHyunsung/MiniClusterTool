@@ -1,0 +1,631 @@
+<title>모듈 베이스 구현 가이드</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: 좌측 목차 + 본문 한 단. 좁으면 목차가 위로. 코드와 표는 각자 가로 스크롤 (가이드 01과 같은 형식) */
+:root{
+  --bg:#f6f7f8; --surface:#ffffff; --fg:#1d2329; --muted:#5b6670; --line:#d9dee3;
+  --accent:#1e5a86; --accent-soft:#e3edf5; --plc:#8a5a00; --plc-soft:#fbf1dc;
+  --warn:#9b2c2c; --warn-soft:#fbe9e9;
+  --code-bg:#eef1f4; --code-fg:#1d2329;
+  --f-body:"IBM Plex Sans KR","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#14181c; --surface:#1b2026; --fg:#e3e7eb; --muted:#9aa5af; --line:#2c333a;
+  --accent:#7fb6e0; --accent-soft:#1d2d3b; --plc:#e3b65c; --plc-soft:#2e2615;
+  --warn:#f0a3a3; --warn-soft:#3a1f22;
+  --code-bg:#11151a; --code-fg:#dfe5ea; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#14181c; --surface:#1b2026; --fg:#e3e7eb; --muted:#9aa5af; --line:#2c333a;
+  --accent:#7fb6e0; --accent-soft:#1d2d3b; --plc:#e3b65c; --plc-soft:#2e2615;
+  --warn:#f0a3a3; --warn-soft:#3a1f22;
+  --code-bg:#11151a; --code-fg:#dfe5ea; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:15.5px;line-height:1.7;padding-inline:16px;padding-block:24px 64px}
+.wrap{max-width:1120px;margin:0 auto;display:grid;grid-template-columns:220px minmax(0,1fr);gap:40px;align-items:start}
+nav{position:sticky;top:calc(env(safe-area-inset-top,0px) + 16px);font-size:13.5px}
+nav p{margin:0 0 8px;font-size:12px;letter-spacing:.08em;color:var(--muted);font-weight:600}
+nav ol{list-style:none;margin:0;padding:0;display:grid;gap:2px;border-left:1px solid var(--line)}
+nav a{display:block;padding:4px 0 4px 12px;color:var(--muted);text-decoration:none;margin-left:-1px;border-left:2px solid transparent}
+nav a:hover,nav a:focus-visible{color:var(--accent);border-left-color:var(--accent);outline:none}
+main{min-width:0;max-width:760px}
+header{padding-bottom:20px;border-bottom:1px solid var(--line);margin-bottom:8px}
+.eyebrow{font-family:var(--f-mono);font-size:12.5px;color:var(--accent);letter-spacing:.04em}
+h1{font-size:30px;line-height:1.3;margin:6px 0 10px;font-weight:700;text-wrap:balance}
+.meta{color:var(--muted);font-size:13.5px;display:flex;flex-wrap:wrap;gap:4px 16px}
+h2{font-size:21px;margin:44px 0 12px;font-weight:700;text-wrap:balance;scroll-margin-top:16px}
+h2 .no{font-family:var(--f-mono);color:var(--accent);font-weight:500;margin-right:8px}
+h3{font-size:16.5px;margin:28px 0 8px;font-weight:600;scroll-margin-top:16px}
+p{margin:0 0 12px}
+ul,ol.steps{margin:0 0 12px;padding-left:22px}
+li{margin:3px 0}
+code{font-family:var(--f-mono);font-size:.88em;background:var(--code-bg);color:var(--code-fg);padding:1px 5px;border-radius:4px}
+pre{background:var(--code-bg);color:var(--code-fg);border:1px solid var(--line);border-radius:6px;padding:14px 16px;overflow-x:auto;font-family:var(--f-mono);font-size:13.2px;line-height:1.6;margin:0 0 16px}
+pre code{background:none;padding:0;font-size:inherit}
+.c{color:var(--muted)}
+.usage{background:var(--accent-soft);border-radius:6px;padding:14px 16px;margin:16px 0}
+.usage p:last-child{margin:0}
+.plc{border-left:3px solid var(--plc);background:var(--plc-soft);padding:10px 14px;margin:12px 0 16px;border-radius:0 6px 6px 0}
+.plc b{color:var(--plc);font-size:12.5px;letter-spacing:.06em;display:block;margin-bottom:2px}
+.plc p:last-child{margin:0}
+.warn{border-left:3px solid var(--warn);background:var(--warn-soft);padding:10px 14px;margin:12px 0 16px;border-radius:0 6px 6px 0}
+.warn b{color:var(--warn);font-size:12.5px;letter-spacing:.06em;display:block;margin-bottom:2px}
+.warn p:last-child{margin:0}
+.layers{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:12px 0 16px}
+.layer{border:1px solid var(--line);background:var(--surface);border-radius:6px;padding:12px 14px;min-width:0}
+.layer.now{border-color:var(--accent)}
+.layer .tag{font-size:12px;font-weight:600;color:var(--muted)}
+.layer.now .tag{color:var(--accent)}
+.layer h4{margin:2px 0 4px;font-size:15px}
+.layer p{margin:0;font-size:14px;color:var(--muted)}
+.tbl{overflow-x:auto;margin:0 0 16px;border:1px solid var(--line);border-radius:6px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:14px;min-width:560px}
+th,td{text-align:left;padding:8px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:12.5px;color:var(--muted);font-weight:600;letter-spacing:.03em;background:var(--bg)}
+tr:last-child td{border-bottom:0}
+td code{white-space:nowrap}
+td.n{font-family:var(--f-mono);font-variant-numeric:tabular-nums;color:var(--muted);white-space:nowrap}
+.order{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:8px 0 16px;font-size:14px}
+.order span{border:1px solid var(--line);background:var(--surface);padding:3px 10px;border-radius:999px}
+.order i{color:var(--muted);font-style:normal}
+ol.tests{padding-left:26px;font-variant-numeric:tabular-nums}
+ol.decided{padding-left:22px;margin:0 0 12px}
+a{color:var(--accent)}
+@media (max-width:860px){
+  .wrap{grid-template-columns:minmax(0,1fr);gap:16px}
+  nav{position:static}
+  nav ol{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));border-left:0}
+  nav a{border-left:0;padding-left:0}
+  .layers{grid-template-columns:1fr}
+  h1{font-size:25px}
+}
+</style>
+
+<div class="wrap">
+<nav aria-label="목차">
+  <p>목차</p>
+  <ol>
+    <li><a href="#s1">1. 정한 것</a></li>
+    <li><a href="#s2">2. 만들 파일</a></li>
+    <li><a href="#s3">3. Fault</a></li>
+    <li><a href="#s4">4. 기능 인터페이스</a></li>
+    <li><a href="#s5">5. 시퀀스: 큰 그림</a></li>
+    <li><a href="#s6">6. Step</a></li>
+    <li><a href="#s7">7. SequenceRunner</a></li>
+    <li><a href="#s8">8. ModuleBase 모습</a></li>
+    <li><a href="#s9">9. ModuleBase가 할 일</a></li>
+    <li><a href="#s10">10. 파생 모듈 쓰는 법</a></li>
+    <li><a href="#s11">11. ModeSelector</a></li>
+    <li><a href="#s12">12. 테스트</a></li>
+    <li><a href="#s13">13. 일부러 뺀 것</a></li>
+  </ol>
+</nav>
+
+<main>
+<header>
+  <div class="eyebrow">FabStack.Core / Module · Sequence · 구현 가이드 02</div>
+  <h1>모듈 베이스와 시퀀스 (층 2)</h1>
+  <div class="meta"><span>2026-10-09 개정</span><span>이전: 구현 가이드 01 운전 상태 모델</span><span>다음: 03 챔버와 LoadLock</span></div>
+</header>
+
+<div class="usage">
+  <p>클래스 모습, 멤버와 시그니처, 쓰인 C# 개념은 AI가 정했어요. 메서드 본문은 현성님이 작성해요. 본문 예시는 ModuleBase.Abort()와 파생 모듈의 시퀀스 세 개예요. 시퀀스는 앞으로 LoadLock을 쓸 때 그대로 따라 할 모양이라 전부 보여 줘요.</p>
+  <p>이 가이드는 TcHit을 참고만 했어요. 도메인에서 필요한 규칙(에러 래칭, Abort 전파, Manual 탈출구)은 남기고, PLC 제약에서 나온 방식(int 에러 코드, seqNo CASE, Exec/Busy/Done 칸, 한 줄로 이어진 인터페이스 상속)은 C# 방식으로 바꿨어요.</p>
+</div>
+
+<h2 id="s1"><span class="no">1</span>이번에 정한 것</h2>
+<div class="layers">
+  <div class="layer"><div class="tag">층 1 · 완료</div><h4>OperationStateMachine</h4><p>상태, 명령 수락, 완료 조건을 보고 자동 전이, 이력, 타임아웃.</p></div>
+  <div class="layer now"><div class="tag">층 2 · 이번</div><h4>SequenceRunner</h4><p>스텝을 하나씩 진행하는 실행기. 스텝 타임아웃, 일시정지 경계, 취소.</p></div>
+  <div class="layer now"><div class="tag">층 2 · 이번</div><h4>ModuleBase</h4><p>상태머신과 실행기 세 개를 들고, 명령에 맞춰 시퀀스를 시작·취소. 하위 에러 수집, Abort/ClearFault 전파.</p></div>
+</div>
+<ol class="decided">
+  <li>에러는 <code>bool Error</code> + <code>int ErrorID</code> 대신 <code>Fault? Fault</code> 하나로 표현해요. Fault는 출처, 코드(enum), 메시지를 담은 record예요. 해제 메서드는 <code>ClearFault()</code>예요. (<a href="#s3">3절</a>)</li>
+  <li>하위 계약은 서로 독립된 작은 인터페이스 셋이에요. <code>IFaultSource</code>, <code>IStandStill</code>, <code>IAbortable</code>. 클래스가 필요한 것만 골라 구현해요. (<a href="#s4">4절</a>)</li>
+  <li>시퀀스는 seqNo CASE 대신 C# 이터레이터(<code>yield return</code>)로 써요. 한 번에 하나씩 꺼내지는 각 스텝은 <code>Step</code> 객체로, 이름, 동작, 완료 조건, 타임아웃을 데이터로 가져요. (<a href="#s5">5~7절</a>)</li>
+  <li>Exec/Busy/Done 같은 단계 개념은 없애요. 시작은 명령이 수락될 때, 완료는 시퀀스가 끝까지 갔을 때, 중단은 실행기를 취소할 때예요.</li>
+  <li>모듈은 상태머신을 상속하지 않고 필드로 가져요. (<a href="#s8">8절</a>)</li>
+  <li>Fault가 생기면 베이스가 자동으로 Abort해요. Aborting 시퀀스는 스텝이 실패해도 다음 스텝으로 계속 가요. (<a href="#s9">9절</a>)</li>
+  <li>멈춘 상태 네 개(Aborted, Homed, Paused, Stopped)는 모두 "하위 전원 StandStill"을 완료 조건으로 가져요.</li>
+  <li>ModeSelector의 Maint/Auto 변경 조건에 모듈 StandStill을 추가해요. Manual에는 추가하지 않아요. (<a href="#s11">11절</a>)</li>
+</ol>
+<p>사양서 6~7주차의 시퀀스 엔진 항목 중 정의 구조, 실행, 일시정지/재개/중단, 구조화된 실패가 이번에 앞당겨 들어와요. 사양서의 "시퀀스를 데이터로 표현"은 스크립트 언어를 만들라는 뜻으로 받지 않아요. 순서와 분기는 C# 코드로 쓰고, 각 스텝의 이름·타임아웃은 데이터로 남기는 방식으로 해석했어요. 공정 값(압력, 시간)은 나중에 레시피에서 받아요.</p>
+
+<h2 id="s2"><span class="no">2</span>만들 파일, 고칠 파일</h2>
+<p>네임스페이스는 전부 <code>FabStack.Core</code> 하나예요. 폴더 안에 만들면 VS가 폴더 이름을 붙이니 만든 직후 지워 주세요.</p>
+<div class="tbl"><table>
+<thead><tr><th>파일</th><th>내용</th></tr></thead>
+<tbody>
+<tr><td><code>Core/Fault.cs</code></td><td>새로 만듦. Fault record</td></tr>
+<tr><td><code>Core/IFaultSource.cs</code>, <code>IStandStill.cs</code>, <code>IAbortable.cs</code></td><td>새로 만듦. 기능 인터페이스 셋</td></tr>
+<tr><td><code>Core/Sequence/Step.cs</code></td><td>새로 만듦. Step record, SequenceFault enum</td></tr>
+<tr><td><code>Core/Sequence/SequenceRunner.cs</code></td><td>새로 만듦. 실행기</td></tr>
+<tr><td><code>Core/Module/ModuleBase.cs</code></td><td>새로 만듦. 모듈 베이스</td></tr>
+<tr><td><code>IValve.cs</code>, <code>IPump.cs</code>, <code>IAnalogSensor.cs</code></td><td>Error/ErrorID/Reset 삭제, 기능 인터페이스 상속</td></tr>
+<tr><td><code>OperationStateMachine.cs</code>, <code>OperationState.cs</code></td><td>Fault 방식으로, <code>OperationErrorCode</code> → <code>OperationFault</code></td></tr>
+<tr><td><code>ModeSelector.cs</code></td><td>StandStill 대상 등록과 규칙 추가</td></tr>
+<tr><td>FakeValve, FakePump, FakeAnalogSensor</td><td>Fault 방식으로, 밸브·펌프에 StandStill 추가, 에러 enum 이름 변경</td></tr>
+<tr><td>기존 테스트</td><td><code>Error</code>/<code>ErrorID</code>/<code>Reset</code> 사용 부분 수정</td></tr>
+</tbody></table></div>
+<p>테스트 쪽에는 <code>SampleModule.cs</code>, <code>FakeAbortable.cs</code>, <code>SequenceRunnerTest.cs</code>, <code>ModuleBaseTest.cs</code>를 만들어요.</p>
+<div class="order"><span>Fault + 인터페이스 셋</span><i>→</i><span>장치·상태머신 전환</span><i>→</i><span>기존 테스트 통과</span><i>→</i><span>Step, SequenceRunner</span><i>→</i><span>러너 테스트</span><i>→</i><span>ModuleBase, ModeSelector</span><i>→</i><span>SampleModule, 모듈 테스트</span></div>
+<p>앞의 세 단계는 구조만 바꾸고 동작은 그대로예요. 여기서 기존 테스트가 전부 통과해야 다음으로 가요. 기존 테스트 수정은 반복 작업이라 원하면 AI가 할게요. 브랜치는 <code>feature/module-base</code> 정도로 따 주세요.</p>
+
+<h2 id="s3"><span class="no">3</span>Fault — 에러를 값 하나로</h2>
+<pre><code>public sealed record Fault(string Source, Enum Code, string Message);</code></pre>
+<p>지금 장치들은 <code>bool Error</code>와 <code>int ErrorID</code> 두 개로 에러를 알려요. PLC에서는 enum을 UDINT로 실어 나를 수밖에 없어서 생긴 방식이에요. C#에서 이걸 그대로 쓰면 두 가지 문제가 생겨요. 밸브의 1(OpenTimeout)과 펌프의 1(RunTimeout)이 같은 숫자라, 모듈이 하위 에러를 모으는 순간 무슨 뜻인지 알 수 없어요. 누가 냈는지도 안 따라와요.</p>
+<p>Fault는 그 세 가지(누가, 무엇을, 사람이 읽을 설명)를 하나로 묶어요. 에러가 없으면 <code>null</code>이에요. 그래서 Error와 ErrorID가 따로 어긋날 일도 없어요.</p>
+<div class="tbl"><table>
+<thead><tr><th>예전</th><th>이제</th></tr></thead>
+<tbody>
+<tr><td><code>valve.Error</code></td><td><code>valve.Fault is not null</code></td></tr>
+<tr><td><code>valve.ErrorID == (int)ValveErrorCode.OpenTimeout</code></td><td><code>valve.Fault?.Code is ValveFault.OpenTimeout</code></td></tr>
+<tr><td><code>Error = true; ErrorID = ...;</code></td><td><code>Fault = new Fault(Name, ValveFault.OpenTimeout, "Open 응답 없음");</code></td></tr>
+<tr><td><code>Reset()</code></td><td><code>ClearFault()</code></td></tr>
+</tbody></table></div>
+<p>에러 enum은 이름을 <code>XxxFault</code>로 맞춰요. <code>ValveFault</code>, <code>PumpFault</code>, <code>AnalogSensorFault</code>, <code>OperationFault</code>. "에러 없음"은 null이 맡으니까 enum의 <code>None</code>/<code>NoError</code> 멤버는 지워요.</p>
+<p>"최초 원인 하나만 남긴다"는 기존 규칙은 그대로예요. 이미 Fault가 있으면 새로 덮지 않아요. 장치는 지금도 에러 중에 Scan이 return하니까 자연스럽게 지켜져요.</p>
+
+<h3>C# 개념: Enum 타입으로 받기</h3>
+<p><code>Enum</code>(대문자)은 모든 enum의 공통 부모 타입이에요. <code>Enum Code</code>에는 ValveFault든 PumpFault든 어떤 enum 값이든 들어가고, 원래 타입을 기억해요. 그래서 <code>fault.Code is ValveFault.OpenTimeout</code>처럼 타입과 값을 함께 확인할 수 있고, <code>fault.Code.ToString()</code>은 "OpenTimeout"이라는 이름을 돌려줘요. 로그나 화면에 숫자 대신 이름이 나와요.</p>
+<h3>C# 개념: ??= 연산자</h3>
+<p><code>a ??= b;</code>는 "a가 null일 때만 b를 넣는다"예요. 최초 원인 유지 규칙이 연산자 하나로 표현돼요. 모듈에서 쓰게 돼요.</p>
+<pre><code>Fault ??= new Fault(Name, code, message);   <span class="c">// 이미 있으면 그대로</span></code></pre>
+<div class="plc"><b>PLC로 치면</b><p><code>IF NOT SeqError THEN SeqError := TRUE; SeqErrorID := id; StateMsg := ...; END_IF</code> 세 변수를 Fault 하나에 담고, IF 문을 <code>??=</code>로 줄인 거예요.</p></div>
+<p>발생 시각은 넣지 않았어요. 장치가 시각을 찍으려면 clock을 필드로 들어야 하는데, 그건 "파츠는 clock을 타이머에만 넘긴다" 규칙과 부딪혀요. 나중에 알람 계층이 Fault를 처음 본 스캔에 시각을 찍으면 한 스캔 안의 오차로 충분해요.</p>
+
+<h2 id="s4"><span class="no">4</span>기능 인터페이스 셋</h2>
+<pre><code>public interface IFaultSource
+{
+    Fault? Fault { get; }        <span class="c">// null = 정상</span>
+    void ClearFault();           <span class="c">// 래치 해제</span>
+}
+
+public interface IStandStill
+{
+    bool StandStill { get; }     <span class="c">// 진행 중인 명령 동작이 없다</span>
+}
+
+public interface IAbortable
+{
+    bool Abort();                <span class="c">// 즉시 정지. 항상 수락</span>
+}</code></pre>
+<p>IFaultSource에 Name이 없는 건 의도예요. 이름은 장치의 신원이지 고장의 속성이 아니에요. 고장을 받는 쪽에 필요한 "누가 냈나"는 Fault.Source에 이미 들어 있어요. 이름은 IValve, IPump, IAnalogSensor처럼 장치 인터페이스가 각자 가져요. 나중에 이름만 공통으로 모아 볼 일이 생기면 그때 이름 전용 인터페이스를 따로 둬요.</p>
+<p>셋은 서로 상속하지 않아요. 클래스가 필요한 것만 쉼표로 이어 붙여요. 인터페이스도 여러 개를 상속할 수 있어서 <code>interface IValve : IFaultSource, IStandStill</code>처럼 써요.</p>
+<div class="tbl"><table>
+<thead><tr><th>타입</th><th>구현하는 기능</th></tr></thead>
+<tbody>
+<tr><td><code>IAnalogSensor</code></td><td>IFaultSource</td></tr>
+<tr><td><code>IValve</code>, <code>IPump</code></td><td>IFaultSource, IStandStill</td></tr>
+<tr><td><code>OperationStateMachine</code></td><td>IFaultSource</td></tr>
+<tr><td><code>ModuleBase</code></td><td>IFaultSource, IStandStill, IAbortable</td></tr>
+<tr><td>로봇, 유닛 (나중)</td><td>IFaultSource, IStandStill, IAbortable</td></tr>
+</tbody></table></div>
+<p>TcHit은 ErrorReset → StandStill → Abortable을 한 줄로 상속했어요. 등록 배열의 타입을 하나로 맞춰야 했기 때문이에요. C#은 목록 하나에 담아 두고 <code>is</code>나 <code>OfType</code>으로 기능을 골라낼 수 있으니 그럴 필요가 없어요. 독립시켜 두면 "Abort는 되는데 정지 보고는 없는" 것도, "에러 보고만 하는" 센서도 억지 없이 표현돼요.</p>
+
+<h3>장치 인터페이스는 이렇게 줄어요</h3>
+<pre><code>public interface IValve : IFaultSource, IStandStill
+{
+    string Name { get; }
+    Permissive OpenPermissive { get; }
+    Permissive ClosePermissive { get; }
+    ValveState State { get; }
+
+    bool Open();
+    bool Close();
+}</code></pre>
+<p>Error, ErrorID, Reset 세 줄은 지우고 Name은 남겨요. 명령은 Fault가 있으면 거부해요. <code>if (!OpenPermissive.IsAllowed || Fault is not null) return false;</code></p>
+
+<h3>StandStill의 정의</h3>
+<p>밸브는 <code>State is not (ValveState.Opening or ValveState.Closing)</code>, 펌프는 <code>State is not (PumpState.Starting or PumpState.Stopping)</code>이에요. 이름은 PLCopen에서 온 모션 제어 용어인데, 언어와 상관없는 업계 용어라 그대로 써요.</p>
+<p>에러 뒤의 Unknown도 StandStill로 쳐요. 타임아웃 난 밸브를 "동작 중"으로 보면 Aborting 완료 조건(하위 전원 StandStill)이 영원히 안 채워져서 Aborting에 갇혀요. 고장 자체는 Fault로 따로 올라가고, Fault가 있는 동안 Home이 거부되니 위험하지 않아요.</p>
+
+<h2 id="s5"><span class="no">5</span>시퀀스 — 큰 그림</h2>
+<p>이번 가이드에서 가장 크게 바뀐 부분이에요. 먼저 전체 그림을 TwinCAT 방식과 나란히 놓고 볼게요.</p>
+<h3>TwinCAT에서는</h3>
+<p>Homing 메서드가 매 스캔 불려요. 메서드 안에서 CASE seqNo로 지금 어느 칸인지 보고, 그 칸의 일을 하고, 조건이 되면 seqNo를 다음 번호로 바꿔요. 스캔이 끝나도 seqNo는 FB의 VAR라 남아 있으니 다음 스캔에 이어서 진행돼요. "어디까지 했는지"를 개발자가 seqNo로 직접 관리하는 거예요.</p>
+<h3>C# 이터레이터에서는</h3>
+<p>같은 일을 위에서 아래로 그냥 써요.</p>
+<pre><code>protected override IEnumerable&lt;Step&gt; Homing()
+{
+    yield return new Step("게이트 닫기", Action: gate.Close, Until: () =&gt; gate.State == ValveState.Closed);
+    yield return new Step("펌프 기동", Action: pump.Run, Until: () =&gt; pump.State == PumpState.Running);
+}</code></pre>
+<p><code>yield return</code>은 "이 스텝을 내보내고 여기서 멈춘다"는 뜻이에요. 실행기가 다음 스텝을 달라고 하면 멈췄던 자리 바로 다음 줄부터 이어서 실행돼요. 어디까지 했는지는 컴파일러가 기억해요. 실제로 C# 컴파일러는 이 메서드를 숨은 상태 번호와 switch를 가진 클래스로 바꿔요. seqNo CASE를 컴파일러가 대신 만들어 주는 셈이에요.</p>
+<div class="tbl"><table>
+<thead><tr><th>TwinCAT</th><th>C# 이터레이터</th></tr></thead>
+<tbody>
+<tr><td><code>seqNo</code> 변수와 CASE</td><td>컴파일러가 만든 숨은 상태 (지금 멈춰 있는 yield 위치)</td></tr>
+<tr><td><code>seqNo := 20;</code> 다음 칸으로</td><td>다음 <code>yield return</code></td></tr>
+<tr><td><code>IF 이미 닫힘 THEN seqNo := 30;</code> 건너뛰기</td><td>그냥 <code>if</code> 문</td></tr>
+<tr><td><code>seqNo := 0;</code> 처음으로 반복</td><td><code>while</code> 문</td></tr>
+<tr><td><code>seqNo := 1000;</code> + 완료 조건 등록</td><td>메서드가 끝나면 완료 (실행기가 알아서 판정)</td></tr>
+<tr><td>Exec 칸의 초기화</td><td>첫 <code>yield return</code> 앞에 쓴 코드</td></tr>
+<tr><td>ErrExec 칸에서 Abort</td><td>실행기 취소 (베이스가 함)</td></tr>
+<tr><td><code>AddLog(seqNo, '...')</code></td><td><code>Step.Name</code> (지금 스텝 이름이 항상 보임)</td></tr>
+<tr><td>스텝별 TON 타임아웃</td><td><code>Step.Timeout</code></td></tr>
+<tr><td>지역 변수는 VAR에</td><td>메서드 지역 변수가 yield 사이에서도 유지됨</td></tr>
+</tbody></table></div>
+<p>스캔 구조는 그대로예요. 스캔 스레드가 매 스캔 실행기를 부르고, 실행기는 지금 스텝의 완료 조건을 보고, 끝났으면 다음 스캔에 다음 스텝을 꺼내요. 블로킹은 어디에도 없어요.</p>
+
+<h3>왜 async/await가 아니고 이터레이터인가</h3>
+<p>C#에서 "순서대로 쓰고 중간에 기다린다"면 보통 async/await를 떠올려요. 그런데 await는 기다림이 끝나면 스레드 풀의 아무 스레드에서나 이어서 실행돼요. 스캔 스레드 밖에서 장치 상태를 건드리게 되니 ADR 0003의 스캔 구조와 맞지 않아요. 이터레이터는 누군가 다음을 달라고 할 때만, 그 호출한 스레드에서 한 칸 진행해요. 실행기를 스캔에서 부르면 시퀀스도 정확히 스캔 안에서만 움직여요.</p>
+
+<h3>C# 개념: 이터레이터는 게으르다</h3>
+<p><code>Homing()</code>을 호출해도 본문은 한 줄도 실행되지 않아요. 호출은 "진행할 준비가 된 객체"만 돌려줘요. 본문은 그 객체에 첫 번째 다음(MoveNext)을 요청할 때 첫 <code>yield return</code>까지 실행돼요. 그래서 명령 메서드에서 <code>Homing()</code>을 불러 실행기에 넘겨도 안전해요. 실제 동작은 다음 스캔에 시작돼요.</p>
+<pre><code>IEnumerator&lt;Step&gt; e = Homing().GetEnumerator();   <span class="c">// 아직 아무것도 안 함</span>
+e.MoveNext();     <span class="c">// 첫 yield return까지 실행. true = 스텝 하나 나옴</span>
+Step s = e.Current;
+e.MoveNext();     <span class="c">// 다음 yield return까지. 메서드가 끝났으면 false</span></code></pre>
+
+<h2 id="s6"><span class="no">6</span>Step — 스텝 하나</h2>
+<pre><code>public sealed record Step(
+    string Name,
+    Func&lt;bool&gt;? Action = null,      <span class="c">// 스텝 시작 시 한 번. false = 명령 거부</span>
+    Func&lt;bool&gt;? Until = null,       <span class="c">// 완료 조건. 매 스캔 확인. null이면 바로 완료</span>
+    TimeSpan? Timeout = null);      <span class="c">// 공정 타임아웃. null이면 감시 안 함</span>
+
+public enum SequenceFault { ActionRejected, StepTimeout }</code></pre>
+<p>스텝은 세 가지 모양으로 쓰여요.</p>
+<pre><code>new Step("게이트 닫기", Action: gate.Close, Until: () =&gt; gate.State == ValveState.Closed)   <span class="c">// 명령 + 도달 대기</span>
+new Step("진공 도달", Until: () =&gt; gauge.Value &lt;= 0.1, Timeout: TimeSpan.FromMinutes(3))    <span class="c">// 기다리기만</span>
+new Step("벤트 밸브 열기", Action: vent.Open)                                                <span class="c">// 명령만</span></code></pre>
+<p>타임아웃의 주인이 여기서 정리돼요. 밸브가 명령에 응답하지 않는 건 밸브가 스스로 타임아웃을 내요(장치 응답 타임아웃). 압력이 3분 안에 안 떨어지는 건 장치 고장이 아니라 공정 문제라 스텝의 Timeout이 맡아요(공정 타임아웃). 전에 정한 "장치 응답 타임아웃은 장치, 공정 타임아웃은 시퀀스/레시피"의 시퀀스 쪽 자리가 이제 생긴 거예요.</p>
+
+<h3>C# 개념: Func&lt;bool&gt;과 메서드 그룹</h3>
+<p><code>Func&lt;bool&gt;</code>은 "인자 없이 bool을 돌려주는 함수"를 담는 타입이에요. Permissive의 조건이 이미 이 타입이에요. <code>Action: gate.Close</code>처럼 괄호 없이 메서드 이름만 쓰면 "그 메서드 자체"가 넘어가요(메서드 그룹). 지금 호출하는 게 아니라 나중에 실행기가 부를 함수를 넘기는 거예요. <code>gate.Close()</code>로 괄호를 붙이면 그 자리에서 바로 실행되니 주의하세요.</p>
+<h3>C# 개념: 이름 붙인 인자</h3>
+<p><code>Action:</code>, <code>Until:</code>, <code>Timeout:</code>처럼 매개변수 이름을 붙여 넘길 수 있어요. 기본값이 있는 매개변수는 건너뛸 수 있어요. 스텝을 읽을 때 무엇이 동작이고 무엇이 조건인지 바로 보여요.</p>
+
+<h2 id="s7"><span class="no">7</span>SequenceRunner — 실행기</h2>
+<pre><code>public sealed class SequenceRunner
+{
+    #region Fields
+    private readonly string owner;              <span class="c">// Fault.Source에 넣을 이름 (모듈 이름)</span>
+    private readonly OnDelayTimer timer;        <span class="c">// 지금 스텝의 경과 시간</span>
+    private IEnumerator&lt;Step&gt;? steps;
+    #endregion
+
+    #region Properties
+    public Step? Current { get; private set; }            <span class="c">// 진행 중인 스텝. null = 스텝과 스텝 사이</span>
+    public bool IsActive =&gt; steps is not null;            <span class="c">// 시작했고 아직 안 끝남</span>
+    public bool IsCompleted { get; private set; }         <span class="c">// 끝까지 갔음</span>
+    public bool AtBoundary =&gt; Current is null;
+    #endregion
+
+    #region Constructor
+    public SequenceRunner(string owner, IClock clock)
+    #endregion
+
+    #region Methods
+    public void Start(IEnumerable&lt;Step&gt; sequence)
+    public void Cancel()
+    public Fault? Advance(bool hold)                      <span class="c">// 스캔마다 한 번. 실패하면 Fault 반환</span>
+    #endregion
+}</code></pre>
+
+<h3>Start, Cancel (직접 작성)</h3>
+<p><code>Start</code>는 먼저 <code>Cancel()</code>로 하던 걸 버리고, <code>steps = sequence.GetEnumerator()</code>, <code>IsCompleted = false</code>로 둬요.</p>
+<p><code>Cancel</code>은 <code>steps?.Dispose()</code> 후 <code>steps = null</code>, <code>Current = null</code>, <code>IsCompleted = false</code>, <code>timer.Stop()</code>이에요. Dispose를 부르면 이터레이터 안의 finally 블록이 실행되고 정리돼요. <code>?.</code>는 "null이 아니면 호출"이에요.</p>
+
+<h3>Advance가 할 일 (직접 작성)</h3>
+<ol class="steps">
+  <li><code>steps</code>가 null이면 null을 반환하고 끝.</li>
+  <li><code>Current</code>가 null이면 (스텝 사이)
+    <ul>
+      <li><code>hold</code>면 아무것도 하지 않고 null 반환. 일시정지는 여기서 걸려요.</li>
+      <li><code>steps.MoveNext()</code>가 false면 시퀀스 끝. <code>IsCompleted = true</code>, <code>steps.Dispose()</code>, <code>steps = null</code>, null 반환.</li>
+      <li>아니면 <code>Current = steps.Current</code>, <code>timer.Tick()</code>. <code>Current.Action</code>이 있으면 부르고, false면 실패(ActionRejected).</li>
+    </ul>
+  </li>
+  <li>완료 확인. <code>Current.Until</code>이 null이거나 true면 <code>Current = null</code>, <code>timer.Stop()</code>, null 반환. 다음 스텝은 다음 스캔에 꺼내요.</li>
+  <li>타임아웃 확인. <code>Current.Timeout</code>이 있고 <code>timer.ElapsedTime()</code>이 그 이상이면 실패(StepTimeout).</li>
+  <li>null 반환 (진행 중).</li>
+</ol>
+<p>실패 처리는 공통이에요. <code>new Fault(owner, 코드, $"{Current.Name}: 설명")</code>을 만들고, <code>Current = null</code>, <code>timer.Stop()</code> 후 그 Fault를 반환해요. 실패한 스텝은 끝난 것으로 쳐요. 다음에 무엇을 할지(Abort할지, 다음 스텝으로 갈지)는 실행기가 아니라 모듈이 정해요.</p>
+<p><code>$"{Current.Name}: 설명"</code>은 문자열 보간이에요. 중괄호 안의 값이 문자열에 끼워져요.</p>
+
+<h3>한 스캔에 스텝 하나</h3>
+<p>3번에서 스텝이 끝나도 같은 스캔에 다음 스텝을 꺼내지 않아요. 이 규칙이 없으면 <code>while (true) { yield return new Step("x"); }</code> 같은 실수 하나로 스캔 스레드가 무한 루프에 빠져요. 한 스텝이 최소 한 스캔을 차지하니까 그런 실수가 나도 시퀀스가 느리게 돌 뿐 스캔은 멈추지 않아요.</p>
+<div class="plc"><b>PLC로 치면</b><p>CASE의 한 칸이 최소 한 스캔인 것과 같아요. 2번에서 동작과 3번 완료 확인은 같은 스캔에 일어나요. 이미 닫혀 있는 밸브에 Close를 걸면 Close가 true만 돌려주고 State가 Closed라서 그 스캔에 바로 끝나요. TcHit 샘플의 "이미 대기 자세면 생략"이 따로 코드를 쓰지 않아도 돼요.</p></div>
+
+<h2 id="s8"><span class="no">8</span>ModuleBase — 모습</h2>
+<pre><code>public abstract class ModuleBase : IFaultSource, IStandStill, IAbortable
+{
+    #region Fields
+    private readonly List&lt;IFaultSource&gt; components = new();
+    private readonly SequenceRunner abortingRunner;
+    private readonly SequenceRunner homingRunner;
+    private readonly SequenceRunner runningRunner;
+    #endregion
+
+    #region Properties
+    public string Name { get; }
+    public OperationState State =&gt; StateMachine.State;
+    public IReadOnlyList&lt;StateTransition&gt; History =&gt; StateMachine.History;
+    public Fault? Fault { get; private set; }             <span class="c">// 이 모듈에서 처음 생긴 Fault (출처 포함)</span>
+    public Step? CurrentStep =&gt; abortingRunner.Current ?? homingRunner.Current ?? runningRunner.Current;
+    public bool StandStill =&gt; ...;                        <span class="c">// 9절</span>
+
+    protected OperationStateMachine StateMachine { get; }
+    protected bool StopRequested =&gt; State == OperationState.Stopping;
+    private bool ComponentsStandStill =&gt; components.OfType&lt;IStandStill&gt;().All(c =&gt; c.StandStill);
+    #endregion
+
+    #region Constructor
+    protected ModuleBase(string name, ModeSelector mode, TransitionTimeouts timeouts, IClock clock, IScanCycle scanCycle)
+    #endregion
+
+    #region Methods
+    public bool Abort()
+    public bool Home()
+    public bool Run()
+    public bool Pause()
+    public bool Stop()
+    public bool SemiAuto()
+    public void ClearFault()
+
+    protected void AddComponent(IFaultSource component)
+    protected void RaiseFault(Enum code, string message)
+
+    protected abstract IEnumerable&lt;Step&gt; Aborting();
+    protected abstract IEnumerable&lt;Step&gt; Homing();
+    protected abstract IEnumerable&lt;Step&gt; Running();
+
+    private void Scan()
+    #endregion
+}</code></pre>
+
+<h3>상태머신을 상속하지 않고 필드로 갖는 이유</h3>
+<p>TcHit의 FB_Module은 <code>EXTENDS FB_StateMachine</code>이었어요. C#에서 <code>class ModuleBase : OperationStateMachine</code>로 가면 상태머신의 public 멤버가 전부 모듈의 public 멤버가 돼요. 밖에서 완료 조건을 넣거나, 하위 전파 없는 Abort를 부를 길이 열려요. Abort에 전파를 끼우려면 virtual을 열어야 하는데, 그러면 층 1의 수락 규칙도 파생 클래스가 바꿀 수 있게 돼요. 그리고 C# 클래스는 부모를 하나만 가질 수 있어요.</p>
+<p>필드로 가지면 밖에서 보이는 건 ModuleBase가 정한 것뿐이고, 층 1은 지금 모습과 테스트 그대로 유효해요. 상태머신을 <code>protected</code>로 둔 건 파생 모듈이 생성자에서 조건(예: RunningCondition, RunPermissive)을 등록해야 해서예요.</p>
+<div class="warn"><b>규칙</b><p>파생 모듈은 <code>StateMachine.Abort()</code> 같은 상태머신 명령을 직접 부르지 않아요. 시퀀스 시작과 하위 전파가 빠져요. 상태머신은 조건 등록용으로만 써요.</p></div>
+
+<h3>실행기를 세 개 두는 이유</h3>
+<p>한 순간에 도는 시퀀스는 하나뿐이니 실행기 하나로도 돼요. 하지만 그러면 완료 조건이 "지금 실행기가 Homing 것이고 끝났는가"처럼 종류까지 따져야 해요. 세 개를 두면 HomedCondition은 <code>homingRunner.IsCompleted</code> 한 줄이에요. 객체 두 개 더 만드는 비용으로 조건이 단순해져요.</p>
+
+<h3>C# 개념: abstract, protected, override</h3>
+<p><code>abstract class</code>는 new 할 수 없고 상속해서만 써요. <code>protected abstract IEnumerable&lt;Step&gt; Homing();</code>은 본문 없는 메서드로, 파생 클래스가 <code>protected override</code>로 반드시 채워야 해요. 빠지면 컴파일 에러예요. 할 일이 없는 시퀀스는 <code>yield break;</code> 한 줄로 채워요(바로 끝나는 시퀀스).</p>
+<div class="plc"><b>PLC로 치면</b><p><code>FUNCTION_BLOCK ABSTRACT</code>, <code>METHOD PROTECTED ABSTRACT</code>와 같아요. 차이는 TcHit의 Homing은 매 스캔 불리는 메서드였고, 여기 Homing은 Home 명령이 수락될 때 한 번 불려서 "스텝들을 내놓는 객체"를 돌려준다는 점이에요. 매 스캔 진행시키는 건 실행기예요.</p></div>
+
+<h3>C# 개념: LINQ OfType / All, ?? 연산자</h3>
+<p><code>components.OfType&lt;IStandStill&gt;()</code>는 목록에서 IStandStill인 것만 골라내고, <code>.All(...)</code>은 전부 조건을 만족하는지 봐요. 비어 있으면 true예요. TcHit의 __QUERYINTERFACE + FOR 루프 AND를 한 줄로 쓴 거예요.</p>
+<p><code>a ?? b ?? c</code>는 "null이 아닌 첫 번째"예요. CurrentStep은 세 실행기 중 진행 중인 스텝이 있는 것을 보여 줘요.</p>
+
+<h2 id="s9"><span class="no">9</span>ModuleBase가 할 일</h2>
+<h3>생성자</h3>
+<ol class="steps">
+  <li><code>Name = name;</code> 실행기 셋을 <code>new SequenceRunner(name, clock)</code>으로 만들어요.</li>
+  <li><code>StateMachine = new OperationStateMachine(name, mode, timeouts, clock, scanCycle);</code></li>
+  <li>아래 표의 조건을 층 1에 등록해요.</li>
+  <li><code>mode.AttachStandStill(this);</code> (<a href="#s11">11절</a>)</li>
+  <li>마지막 줄: <code>scanCycle.Register(Scan);</code></li>
+</ol>
+<div class="tbl"><table>
+<thead><tr><th>층 1 Permissive</th><th>등록할 조건</th></tr></thead>
+<tbody>
+<tr><td><code>AbortedCondition</code></td><td><code>abortingRunner.IsCompleted</code>, <code>ComponentsStandStill</code></td></tr>
+<tr><td><code>HomedCondition</code></td><td><code>homingRunner.IsCompleted</code>, <code>ComponentsStandStill</code></td></tr>
+<tr><td><code>PausedCondition</code></td><td><code>runningRunner.AtBoundary</code>, <code>ComponentsStandStill</code></td></tr>
+<tr><td><code>StoppedCondition</code></td><td><code>runningRunner.IsCompleted</code>, <code>ComponentsStandStill</code></td></tr>
+<tr><td><code>HomePermissive</code>, <code>RunPermissive</code>, <code>SemiAutoPermissive</code></td><td><code>Fault is null</code></td></tr>
+</tbody></table></div>
+<p>멈춘 상태 네 개에 모두 하위 StandStill을 거는 이유는, 모듈의 StandStill 정의(아래)와 맞추기 위해서예요. "Homed인데 밸브가 아직 움직이는 중"이 생기지 않아요. 마지막 줄은 층 1이 자기 Fault만 보기 때문에 필요해요. 하위 밸브의 Fault를 층 1은 모르니까 모듈 Fault를 수락 조건으로 넣어 줘요.</p>
+<p>파생 모듈이 등록하는 건 RunningCondition(Idle ⇄ Running, 일감 유무)과, 필요하면 추가 수락 조건(예: Run에 "도어 닫힘")뿐이에요. "시퀀스 완료"는 베이스가 이미 넣었으니 seqNo == 1000 같은 등록은 없어요.</p>
+
+<h3>명령은 시퀀스를 시작한다</h3>
+<p>시퀀스는 스캔에서 상태를 보고 시작하지 않고, 명령이 수락되는 그 자리에서 시작해요. 이유가 있어요. Home 명령이 스캔과 스캔 사이에 들어오면, 다음 스캔에서는 층 1이 모듈보다 먼저 돌아요(<a href="#s9-scan">아래</a>). 그때 homingRunner.IsCompleted가 지난번 Home의 값(true)으로 남아 있으면 층 1이 그 스캔에 바로 Homed로 넘겨 버려요. 명령 안에서 Start를 부르면 IsCompleted가 false로 먼저 바뀌니 이런 일이 없어요. Start는 이터레이터를 만들기만 하고 본문은 실행하지 않으니 명령 안에서 불러도 가벼워요.</p>
+<div class="tbl"><table>
+<thead><tr><th>명령</th><th>수락되면</th></tr></thead>
+<tbody>
+<tr><td><code>Abort</code></td><td>Homing·Running 실행기 Cancel, <code>abortingRunner.Start(Aborting())</code>, 하위 IAbortable 전파</td></tr>
+<tr><td><code>Home</code></td><td><code>homingRunner.Start(Homing())</code></td></tr>
+<tr><td><code>Run</code></td><td>Paused에서 온 재개면 아무것도 안 함(멈춘 자리부터 이어감). 아니면 <code>runningRunner.Start(Running())</code></td></tr>
+<tr><td><code>SemiAuto</code></td><td><code>runningRunner.Start(Running())</code></td></tr>
+<tr><td><code>Pause</code>, <code>Stop</code></td><td>상태머신에 넘기기만 해요. 진행 방식은 스캔이 상태를 보고 바꿔요</td></tr>
+</tbody></table></div>
+<p>재개인지는 <code>StateMachine.Run()</code>이 true를 반환한 직후 <code>StateMachine.Resumed</code>로 알 수 있어요. 재개할 때 처음부터 다시 시작하지 않으니, TcHit처럼 "Exec 칸에서 P_Resumed로 초기화를 막는" 코드가 파생 모듈에서 사라져요.</p>
+
+<h3>예시: Abort() 전체</h3>
+<pre><code>public bool Abort()
+{
+    if (State == OperationState.Aborting) return true;   <span class="c">// 재진입: 다시 시작하지도, 전파하지도 않는다</span>
+
+    StateMachine.Abort();
+    homingRunner.Cancel();
+    runningRunner.Cancel();
+    abortingRunner.Start(Aborting());
+
+    foreach (IFaultSource component in components)
+    {
+        if (component is IAbortable abortable)
+            abortable.Abort();
+    }
+    return true;
+}</code></pre>
+<p>하위 Abort는 수락 즉시 나가요. Aborting 시퀀스의 첫 스텝은 다음 스캔에 시작되니, 하위는 그보다 먼저 멈춰요. 정지 전에 판정할 게 있는 하위는 AddComponent로 등록하지 말고 Aborting 시퀀스의 스텝에서 직접 불러요.</p>
+<p><code>component is IAbortable abortable</code>는 "component가 IAbortable이면 그 타입으로 abortable에 담고 true"예요.</p>
+<div class="plc"><b>PLC로 치면</b><p><code>IF __QUERYINTERFACE(iComponents[i], iAbortable) THEN iAbortable.Abort();</code>와 같아요.</p></div>
+<p>Home, Run, SemiAuto는 같은 모양이에요. 상태머신 명령이 false면 바로 false를 반환하고, true면 위 표대로 시작한 뒤 true를 반환해요. 이 명령들은 virtual로 열지 않아요. 수락 조건을 더하고 싶으면 override가 아니라 Permissive를 써요.</p>
+
+<h3>ClearFault, RaiseFault, AddComponent (직접 작성)</h3>
+<p><code>ClearFault()</code>는 <code>Fault = null</code>, <code>StateMachine.ClearFault()</code>, 하위 전원 <code>ClearFault()</code>예요. 하위 고장 원인이 그대로면 다음 스캔에 다시 Fault가 잡혀요. 그게 맞는 동작이에요.</p>
+<p><code>RaiseFault(Enum code, string message)</code>는 <code>Fault ??= new Fault(Name, code, message);</code> 한 줄이에요. 파생 모듈이 시퀀스 중에 공정 판단으로 에러를 낼 때 써요.</p>
+<p><code>AddComponent</code>는 목록에 이미 있으면 무시하고 없으면 추가해요. protected라서 파생 모듈 생성자에서만 부를 수 있어요. "하위 등록은 생성 시 한 번"을 접근 제한자로 지키는 거예요.</p>
+
+<h3 id="s9-scan">Scan이 할 일 (직접 작성)</h3>
+<ol class="steps">
+  <li>하위 Fault 수집. 모듈 Fault가 아직 없으면 상태머신 Fault, 그다음 하위 중 첫 Fault를 가져와요. <code>Fault ??= StateMachine.Fault ?? components.Select(c =&gt; c.Fault).FirstOrDefault(f =&gt; f is not null);</code></li>
+  <li>지금 상태에 맞는 실행기를 한 번 진행해요. switch 식으로 고르면 깔끔해요.
+<pre><code>Fault? failure = State switch
+{
+    OperationState.Aborting =&gt; abortingRunner.Advance(hold: false),
+    OperationState.Homing =&gt; homingRunner.Advance(hold: false),
+    OperationState.Idle or OperationState.Running or OperationState.Stopping or OperationState.SemiAuto
+        =&gt; runningRunner.Advance(hold: false),
+    OperationState.Pausing or OperationState.Paused =&gt; runningRunner.Advance(hold: true),
+    _ =&gt; null
+};</code></pre></li>
+  <li><code>Fault ??= failure;</code></li>
+  <li>자동 Abort. Fault가 있고 상태가 Homing, Idle, Running, Pausing, Stopping, SemiAuto 중 하나면 <code>Abort()</code>.</li>
+</ol>
+<div class="warn"><b>주의: ??= 오른쪽은 왼쪽이 null일 때만 실행된다</b><p><code>Fault ??= abortingRunner.Advance(false);</code>처럼 한 줄로 쓰면 안 돼요. 모듈에 이미 Fault가 있으면 오른쪽 자체가 실행되지 않아서 Advance가 불리지 않아요. 에러로 Abort된 모듈의 Aborting 시퀀스가 영원히 진행되지 않게 돼요. 2번처럼 Advance 결과를 변수에 먼저 받고, 3번에서 래칭해요.</p></div>
+<p>1번을 2번보다 먼저 하는 이유는 시간 순서예요. 하위 장치 Scan은 모듈 Scan보다 먼저 돌아서, 같은 스캔에 둘 다 생겼다면 하위 쪽이 먼저 생긴 거예요. 밸브가 응답하지 않아 스텝이 타임아웃 났다면 원인으로 남아야 하는 건 밸브 Fault예요.</p>
+<p>Pausing에서 hold: true를 넘기면 진행 중이던 스텝은 끝까지 가고, 다음 스텝을 꺼내지 않아요. 그 순간 AtBoundary가 true가 되어 층 1이 Paused로 넘겨요. Run으로 재개하면 hold가 풀려 다음 스텝부터 이어가요.</p>
+<p>Aborting 중에는 스텝이 실패해도 실행기가 그 스텝을 끝난 것으로 치고 다음 스캔에 다음 스텝으로 가요. Fault만 남아요. Abort는 에러에 대한 대응 그 자체라서, 정지 동작 하나가 실패했다고 나머지 정지 동작을 건너뛰면 안 되기 때문이에요.</p>
+
+<h3>자동 Abort를 베이스가 하는 이유</h3>
+<p>TcHit은 파생 모듈의 ErrExec 칸에 Abort를 직접 쓰게 했어요. 장비(머신)가 모듈에 Abort를 전파하는 구조가 위에 있었기 때문이에요. 우리 모듈은 단독으로 돌고, 위에서 Abort를 걸어 줄 객체가 없어요. 파생 모듈마다 쓰게 하면 하나만 빠뜨려도 에러 난 채로 시퀀스가 계속 돌아요. 그래서 "Fault = 정지"를 베이스에 고정해요.</p>
+<p>Homed, Paused, Stopped, Aborted에서는 Abort하지 않아요. 시퀀스가 돌고 있지 않고, Fault 중에는 Home·Run·SemiAuto가 거부되니 그걸로 충분해요. Homed에서 Aborted로 떨어뜨리면 Home을 다시 해야 해서 손해예요.</p>
+
+<h3>StandStill</h3>
+<pre><code>public bool StandStill =&gt;
+    (State is OperationState.Aborted or OperationState.Homed or OperationState.Paused or OperationState.Stopped)
+    &amp;&amp; ComponentsStandStill;</code></pre>
+
+<h3>스캔 순서와 진행 예</h3>
+<p>스캔 사이클은 등록 순서대로 불러요. 장치는 모듈 생성자의 인자라 먼저 만들어지고, 상태머신은 베이스 생성자 안에서, 모듈 Scan은 베이스 생성자 마지막에 등록돼요.</p>
+<div class="order"><span>장치 Scan</span><i>→</i><span>상태머신 Scan</span><i>→</i><span>모듈 Scan</span></div>
+<p>밸브 하나를 가진 모듈에 Home을 걸면 이렇게 가요(밸브 동작 시간 100ms, 스캔 10ms).</p>
+<div class="tbl"><table>
+<thead><tr><th>스캔</th><th>상태머신 Scan</th><th>모듈 Scan</th></tr></thead>
+<tbody>
+<tr><td class="n">명령</td><td colspan="2">Home() 수락 → 상태 Homing, homingRunner.Start (IsCompleted false)</td></tr>
+<tr><td class="n">1</td><td>HomedCondition 미충족 → Homing 유지</td><td>MoveNext → 스텝 "밸브 닫기", Close() → 밸브 Closing, Until 거짓</td></tr>
+<tr><td class="n">2~10</td><td>미충족</td><td>Until 거짓 (밸브 Closing)</td></tr>
+<tr><td class="n">11</td><td>미충족</td><td>밸브 Closed → Until 참 → Current null</td></tr>
+<tr><td class="n">12</td><td>미충족 (아직 IsCompleted 아님)</td><td>MoveNext false → IsCompleted true</td></tr>
+<tr><td class="n">13</td><td>IsCompleted, 밸브 StandStill → Homed</td><td>상태 Homed라 진행할 실행기 없음</td></tr>
+</tbody></table></div>
+<p>층 1이 모듈 결과를 한 스캔 늦게 보는 건 ADR 0005에 적어 둔 그대로예요. 10ms 스캔에서 문제 되는 크기가 아니에요.</p>
+
+<h3>C# 개념: 생성자 실행 순서</h3>
+<p><code>: base(...)</code>는 부모 생성자를 먼저 실행한다는 뜻이에요. 부모 생성자가 끝까지 돈 다음에 파생 생성자 본문이 실행돼요.</p>
+<div class="warn"><b>주의: 베이스의 "마지막 줄"은 객체의 마지막 줄이 아니다</b><p>ModuleBase 생성자 마지막 줄에서 Scan을 등록해도, 그 뒤에 파생 생성자 본문(장치 필드 대입, 조건 등록)이 남아 있어요. 다른 스레드에서 스캔이 이미 돌고 있다면 파생 필드가 null인 채로 Scan이 불릴 수 있어요. 테스트에서는 문제없어요. FakeScanCycle은 RunScans를 부를 때만 도는데 그건 조립이 끝난 뒤니까요. 실행용 스캔 사이클(Infrastructure)을 만들 때 "조립이 끝난 뒤 Start()로 시작한다"를 요구 사항으로 넣어야 해요. 그게 실제 안전장치예요.</p></div>
+
+<h2 id="s10"><span class="no">10</span>파생 모듈은 이렇게 쓴다 — SampleModule</h2>
+<p>테스트용 모듈이에요. 밸브 하나를 갖고, Home하면 밸브를 닫고, Run하면 일감이 들어올 때마다 밸브를 열었다 닫아요. LoadLock도 같은 모양으로 쓰게 돼요. 테스트 프로젝트에 둬요.</p>
+<pre><code>public class SampleModule : ModuleBase
+{
+    #region Fields
+    private readonly IValve valve;
+    private readonly TimeSpan? openTimeout;
+    #endregion
+
+    #region Properties
+    public bool HasWork { get; set; }               <span class="c">// 테스트가 일감 유무를 넣는다</span>
+    public int CycleCount { get; private set; }     <span class="c">// 끝낸 사이클 수</span>
+    #endregion
+
+    #region Constructor
+    public SampleModule(string name, IValve valve, ModeSelector mode, TransitionTimeouts timeouts,
+                        IClock clock, IScanCycle scanCycle, TimeSpan? openTimeout = null)
+        : base(name, mode, timeouts, clock, scanCycle)
+    {
+        this.valve = valve;
+        this.openTimeout = openTimeout;
+        AddComponent(valve);
+
+        StateMachine.RunningCondition.AddCondition(() =&gt; HasWork, "일감 없음");
+    }
+    #endregion
+
+    #region Methods
+    public void AddForTest(IFaultSource component) =&gt; AddComponent(component);
+    public void RaiseForTest(Enum code) =&gt; RaiseFault(code, "테스트");
+
+    protected override IEnumerable&lt;Step&gt; Aborting()
+    {
+        yield break;      <span class="c">// 밸브는 출력 유지 장치라 정지할 게 없다</span>
+    }
+
+    protected override IEnumerable&lt;Step&gt; Homing()
+    {
+        yield return new Step("밸브 닫기", Action: valve.Close, Until: () =&gt; valve.State == ValveState.Closed);
+    }
+
+    protected override IEnumerable&lt;Step&gt; Running()
+    {
+        while (!StopRequested)
+        {
+            yield return new Step("일감 대기", Until: () =&gt; HasWork || StopRequested);
+            if (StopRequested) yield break;
+
+            yield return new Step("밸브 열기", Action: valve.Open,
+                                  Until: () =&gt; valve.State == ValveState.Opened, Timeout: openTimeout);
+            yield return new Step("밸브 닫기", Action: valve.Close,
+                                  Until: () =&gt; valve.State == ValveState.Closed);
+            CycleCount++;
+        }
+    }
+    #endregion
+}</code></pre>
+<p>Running이 반복 구조인 걸 보세요. Run을 받으면 Stop 요청이 올 때까지 사이클을 돌아요. Stop(사이클 스톱)이 오면 지금 사이클을 끝까지 마치고 while 조건에서 빠져나가 시퀀스가 끝나요. 그러면 runningRunner.IsCompleted가 true가 되고 층 1이 Stopped로 넘겨요. 일감을 기다리는 스텝의 Until에 <code>|| StopRequested</code>를 넣은 이유는, 일감이 없을 때 Stop이 오면 기다리던 스텝에서 바로 빠져나오게 하려는 거예요. 기다리는 스텝을 쓸 때마다 "여기서 Stop이 오면 어떻게 되나"를 생각해야 해요.</p>
+<p><code>CycleCount++</code>는 스텝이 아니라 그냥 코드예요. 두 yield 사이의 코드는 다음 스텝을 꺼낼 때 실행돼요. 상태 갱신이나 데이터 기록(웨이퍼 상태 변경 같은 것)은 이렇게 써요.</p>
+<p>Exec 칸, seqNo, 완료 번호 등록, Resumed 확인, ErrExec에서 Abort 부르기가 전부 없어요. 파생 모듈은 "무엇을 어떤 순서로 하는가"만 써요.</p>
+<div class="warn"><b>이터레이터 안에서 하지 말 것</b><p>스텝 밖에서 장치 명령을 직접 부르지 마세요(<code>valve.Open();</code>만 단독으로). 거부돼도 아무도 모르고, 타임아웃도 안 걸려요. 명령은 항상 Step의 Action으로 넘겨요. 그리고 try/finally의 finally 안에 장치 명령을 넣지 마세요. Abort로 취소될 때 finally가 실행되는데, 정지 동작은 Aborting 시퀀스가 책임져야 해요.</p></div>
+<p><code>FakeAbortable</code>은 IFaultSource, IStandStill, IAbortable을 구현한 대역이에요. Name, <code>Fault</code>(set 가능), <code>StandStill</code>(set 가능, 기본 true), <code>AbortCount</code>, <code>ClearCount</code>를 두고, Abort()는 AbortCount를 올리고 true를 반환해요. ClearFault()는 ClearCount를 올리고 Fault를 null로 돌려요.</p>
+
+<h2 id="s11"><span class="no">11</span>ModeSelector — 고정 규칙에 StandStill 추가</h2>
+<pre><code><span class="c">// Fields에 추가</span>
+private readonly List&lt;IStandStill&gt; standStillMembers = new();
+
+<span class="c">// Methods에 추가 — ModuleBase 생성자가 부른다. 이미 있으면 무시</span>
+internal void AttachStandStill(IStandStill member)</code></pre>
+<p>Change에서 Maint와 Auto로 바꿀 때만 <code>standStillMembers.All(m =&gt; m.StandStill)</code>을 고정 규칙에 AND해요.</p>
+<p>Maint/Auto에 넣는 이유는, Aborted 상태에서도 Manual 조작으로 밸브가 움직이고 있을 수 있어서예요. 움직이는 중에 Auto로 넘어가면 Home 시퀀스가 그 밸브에 명령을 겹쳐 내요. Manual에 넣지 않는 이유는 데드락이에요. 장치가 안 멈춰서 Aborting에 갇혔을 때 Manual로 빠져서 손으로 정리하는 게 유일한 탈출구예요. 여기에 StandStill을 걸면 "안 멈춰서 갇혔는데 멈춰야 Manual로 갈 수 있다"가 돼요.</p>
+<p>Attach와 이름을 나눈 건 두 목록의 뜻이 달라서예요. Attach는 상태 규칙(Aborted/Homed 등)의 대상, AttachStandStill은 정지 규칙의 대상이에요. 호출하는 줄만 봐도 어느 규칙에 들어가는지 보여요.</p>
+
+<h2 id="s12"><span class="no">12</span>테스트</h2>
+<h3>기존 테스트 전환</h3>
+<p>FakeValveTest, OperatingStateMachineTest의 <code>Error</code>/<code>ErrorID</code>/<code>Reset</code>을 <a href="#s3">3절 표</a>대로 바꿔요. 동작은 그대로라 전부 통과해야 해요. FakeValveTest에는 타임아웃 시 <code>Fault.Source == "V1"</code>을 확인하는 줄을 하나 추가해 주세요.</p>
+<h3>SequenceRunnerTest.cs</h3>
+<p>스캔 사이클 없이 <code>FakeClock</code>과 실행기만 만들고 Advance를 직접 불러요. 시간은 <code>clock.Advance(...)</code>로 밀어요. 시퀀스는 테스트 클래스 안에 private 이터레이터 메서드로 만들어 넘기면 돼요.</p>
+<ol class="tests">
+  <li>Start만 하고 Advance하지 않으면 시퀀스 본문이 실행되지 않는다 (첫 yield 앞에서 카운터를 올려 확인)</li>
+  <li>Until이 바로 참인 스텝 3개: Advance 3번에 스텝이 하나씩 끝나고, 4번째에 IsCompleted</li>
+  <li>Until이 거짓인 동안 Current는 같은 스텝, 참이 되면 다음 Advance에 다음 스텝</li>
+  <li>Action이 false를 반환하면 Fault.Code가 ActionRejected이고 Message에 스텝 이름이 있다</li>
+  <li>Timeout을 넘기면 StepTimeout. Timeout이 null이면 아무리 기다려도 실패하지 않는다</li>
+  <li>hold: true면 진행 중인 스텝은 끝까지 가고, 다음 스텝은 꺼내지 않는다 (AtBoundary true). hold를 풀면 이어서 진행</li>
+  <li>Cancel하면 IsActive, IsCompleted 모두 false. 다시 Start하면 처음부터</li>
+</ol>
+<h3>ModuleBaseTest.cs</h3>
+<p>생성자에서 이 순서로 만들어요. 밸브를 먼저 만들어야 스캔 순서가 장치 → 상태머신 → 모듈이 돼요.</p>
+<pre><code>clock = new FakeClock();
+scanCycle = new FakeScanCycle(clock, TimeSpan.FromMilliseconds(10));
+valve = new FakeValve("V1", ValveState.Opened, TimeSpan.FromMilliseconds(100), TimeSpan.FromSeconds(1), clock, scanCycle);
+mode = new ModeSelector(OperationMode.Maint);
+module = new SampleModule("M1", valve, mode, new TransitionTimeouts(Aborting: TimeSpan.FromSeconds(1)), clock, scanCycle);</code></pre>
+<p>대부분의 테스트는 <code>module.Abort()</code> 후 <code>RunScans(50ms)</code>로 Aborted에서 시작하면 편해요. Run이 필요한 테스트는 <code>new ModeSelector(OperationMode.Auto)</code>로 만들어요. Auto에서도 Home은 수락돼요.</p>
+<ol class="tests">
+  <li>Abort 후 1스캔에는 Aborting, 스캔 1번 더 돌리면 Aborted (빈 Aborting 시퀀스는 첫 스캔에 끝나고, 층 1은 다음 스캔에 그걸 본다)</li>
+  <li>Aborted에서 밸브를 직접 Close하고 바로 Abort하면, 밸브가 Closing인 동안 Aborting 유지, 닫힌 뒤 Aborted</li>
+  <li>FakeAbortable을 등록하고 Abort하면 AbortCount == 1. Aborting 중 Abort를 한 번 더 불러도 1</li>
+  <li>Home → Homing 중 CurrentStep.Name == "밸브 닫기", StandStill false → Homed, StandStill true</li>
+  <li>Homing 중 <code>valve.RespondsToCommand = false</code> → 1초 뒤 밸브 Fault → 모듈 Fault.Source == "V1", 스스로 Aborting → Aborted. Home 거부</li>
+  <li>5번 이어서 ClearFault → 밸브 Fault null, 모듈 Fault null, Home 수락</li>
+  <li>FakeAbortable.Fault를 세우고 스캔을 한 번 돌린 뒤 RaiseForTest → 모듈 Fault는 FakeAbortable 것 그대로 (최초 원인 유지). 스캔 전에 부르면 모듈이 아직 하위 Fault를 못 본 상태라 RaiseForTest 쪽이 먼저가 돼요</li>
+  <li>Homed 상태에서 FakeAbortable.Fault를 세우면 모듈 Fault는 생기지만 상태는 Homed 유지</li>
+  <li>Auto: Run → Idle, CurrentStep "일감 대기" → HasWork = true → Running, 밸브가 열렸다 닫히며 CycleCount가 늘어난다. HasWork = false로 돌리면 사이클을 마친 뒤 "일감 대기"에서 Idle</li>
+  <li>"밸브 열기" 진행 중에 Pause → 밸브가 열린 뒤 Paused, CurrentStep null. Run → "밸브 닫기"부터 이어감 (처음 "일감 대기"로 돌아가지 않음)</li>
+  <li>사이클 중 Stop → 그 사이클의 "밸브 닫기"까지 마치고 Stopped. HasWork가 false일 때 Stop하면 바로 Stopped</li>
+  <li>openTimeout을 300ms로 만들고 사이클 중 <code>valve.RespondsToCommand = false</code> → 300ms 뒤 모듈 Fault.Code == SequenceFault.StepTimeout, Message에 "밸브 열기", 자동 Abort (밸브 타임아웃 1초보다 먼저)</li>
+  <li>Aborted에서 밸브를 직접 Close(동작 중)하면 Auto 변경 거부, Manual 변경 수락. 밸브가 닫힌 뒤 Maint 변경 수락</li>
+  <li>모듈 Fault 중 Home은 거부되고 History는 늘지 않는다</li>
+</ol>
+<p>테스트 이름은 검증 내용이 읽히게 지어 주세요. 예: <code>Pause_DuringStep_FinishesStepThenPauses</code></p>
+
+<h2 id="s13"><span class="no">13</span>이번에 일부러 뺀 것</h2>
+<ul>
+  <li>스텝 실행 이력: 실행기가 스텝 시작·종료 시각과 결과를 목록에 남기면 돼요. Current와 Fault 메시지로 당분간 충분해서 미뤘어요. 사양서 6~7주차 항목이라 그때 넣어요.</li>
+  <li>SemiAuto 1스텝 진행: 실행기 hold를 "스텝 진행 버튼이 눌린 스캔만 false"로 주면 돼요. 구조는 이미 받쳐 줘요. 필요할 때 추가해요.</li>
+  <li>장비 계층: 모듈 간 직접 핸드셰이크 방향이라 필요할 때 만들어요. ModuleBase가 IAbortable이니 그때 그대로 하위로 등록할 수 있어요.</li>
+  <li>알람 계층: 여러 Fault를 목록으로 보여 주고, 발생 시각을 찍고, 이력을 DB에 남기는 것. Fault record가 그 재료가 돼요.</li>
+  <li>경고 등급: 지금은 Fault = 정지 하나뿐이에요. 멈추지 않아도 되는 이상은 Fault가 아니라 경고로, 알람 등급을 정할 때 나눠요.</li>
+  <li>명령 스레드와 스캔 스레드의 동시 접근: 명령이 실행기를 Start/Cancel하니 이 문제가 더 분명해졌어요. 실행용 스캔 사이클을 만들 때 lock 하나로 직렬화해요(ADR 0005 결정 그대로). Start() 시점 요구 사항도 그때 같이 반영해요.</li>
+</ul>
+<p>다음 가이드 03에서는 챔버(진공 속성, 펌핑/벤팅)와 LoadLock 모듈을 다뤄요. 펌핑은 "러핑 밸브 열기 → 진공 도달(Timeout 있음) → 밸브 닫기" 같은 스텝 목록이 돼요.</p>
+</main>
+</div>
