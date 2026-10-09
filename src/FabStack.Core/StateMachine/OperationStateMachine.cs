@@ -50,9 +50,6 @@ namespace FabStack.Core
             this.clock = clock;
             timer = new OnDelayTimer(clock);
 
-            scanCycle.Register(Scan);
-
-
             HomePermissive = new Permissive();
             RunPermissive = new Permissive();
             SemiAutoPermissive = new Permissive();
@@ -62,6 +59,8 @@ namespace FabStack.Core
             PausedCondition = new Permissive(); 
             StoppedCondition = new Permissive();
             RunningCondition = new Permissive();
+
+            scanCycle.Register(Scan);
         }
         #endregion
 
