@@ -83,7 +83,7 @@ namespace FabStack.Core
             return null;
         }
 
-        // 실패한 스텝은 끝난 것으로 친다. 다음 행동(Abort, 다음 스텝 진행)은 모듈이 정한다
+        // 실패한 스텝은 끝난 것으로 친다. 다음 행동은 실행기가 정하지 않는다 (Aborting 중이면 상태머신이 다음 스텝 진행, 그 밖은 모듈이 자동 Abort)
         private Fault Fail(SequenceFault code, string reason)
         {
             Fault fault = new Fault(owner, code, $"{Current!.Name}: {reason}");

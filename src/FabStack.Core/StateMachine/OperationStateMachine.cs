@@ -1,7 +1,4 @@
 ﻿using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.Reflection;
 using System.Text;
 
 namespace FabStack.Core
@@ -14,6 +11,10 @@ namespace FabStack.Core
         private readonly IClock clock;                 // 이력 시각용 (아래 설명)
         private readonly OnDelayTimer timer;           // 전이 상태 진입 시각 (TON)
         private readonly List<StateTransition> history = new();
+        private readonly OperationSequences sequences;
+        private readonly SequenceRunner abortingRunner;
+        private readonly SequenceRunner homingRunner;
+        private readonly SequenceRunner runningRunner;
         #endregion
 
         #region Properties
@@ -35,10 +36,12 @@ namespace FabStack.Core
         public IReadOnlyList<StateTransition> History => history;
 
         public Fault? Fault { get; private set; }
+
+        public Step? CurrentStep => abortingRunner.Current ?? homingRunner.Current ?? runningRunner.Current;
         #endregion
 
         #region Constructor
-        public OperationStateMachine(string name, ModeSelector mode, TransitionTimeouts timeouts, IClock clock, IScanCycle scanCycle)
+        public OperationStateMachine(string name, ModeSelector mode, TransitionTimeouts timeouts, OperationSequences sequences, IClock clock, IScanCycle scanCycle)
         {
             Name = name;
             
@@ -59,15 +62,31 @@ namespace FabStack.Core
             StoppedCondition = new Permissive();
             RunningCondition = new Permissive();
 
+            this.sequences = sequences;
+            abortingRunner = new SequenceRunner(name, clock);
+            homingRunner = new SequenceRunner(name, clock);
+            runningRunner = new SequenceRunner(name, clock);
+
             scanCycle.Register(Scan);
         }
         #endregion
 
         #region Methods
+        private void StartSequence(SequenceRunner target, IEnumerable<Step> sequence)
+        {
+            homingRunner.Cancel();
+            runningRunner.Cancel();
+            abortingRunner.Cancel();
+
+            target.Start(sequence);
+        }
+
         public bool Abort()
         {
-            if(State != OperationState.Aborting)
-                ChangeState(OperationState.Aborting, TransitionTrigger.Abort);
+            if (State == OperationState.Aborting) return true;
+
+            StartSequence(abortingRunner, sequences.Aborting());
+            ChangeState(OperationState.Aborting, TransitionTrigger.Abort);
             return true;
         }
 
@@ -77,6 +96,7 @@ namespace FabStack.Core
             if (mode.Mode is not (OperationMode.Maint or OperationMode.Auto)) return false;
             if (Fault is not null || !HomePermissive.IsAllowed) return false;
 
+            StartSequence(homingRunner, sequences.Homing());
             ChangeState(OperationState.Homing, TransitionTrigger.Home);
             return true;
         }
@@ -88,6 +108,9 @@ namespace FabStack.Core
             if (Fault is not null || !RunPermissive.IsAllowed) return false;
         
             Resumed = State == OperationState.Paused;
+            if (!Resumed || !runningRunner.IsActive)       // 재개라도 Pausing 중 시퀀스가 끝났으면 새로 시작
+                StartSequence(runningRunner, sequences.Running());
+
             ChangeState(OperationState.Idle, TransitionTrigger.Run);
             return true;
         }
@@ -116,6 +139,7 @@ namespace FabStack.Core
             if (mode.Mode is not (OperationMode.Maint)) return false;
             if (Fault is not null || !SemiAutoPermissive.IsAllowed) return false;
 
+            StartSequence(runningRunner, sequences.Running());
             ChangeState(OperationState.SemiAuto, TransitionTrigger.SemiAuto);
             return true;
         }
@@ -131,6 +155,17 @@ namespace FabStack.Core
 
         private void Scan()
         {
+            Fault? failure = State switch
+            {
+                OperationState.Aborting => abortingRunner.Advance(hold: false),
+                OperationState.Homing => homingRunner.Advance(hold: false),
+                OperationState.Idle or OperationState.Running or OperationState.Stopping or OperationState.SemiAuto
+                    => runningRunner.Advance(hold: false),
+                OperationState.Pausing or OperationState.Paused => runningRunner.Advance(hold: true),
+                _ => null
+            };
+            Fault ??= failure;
+
             if (State == OperationState.Running && !RunningCondition.IsAllowed)
             {
                 ChangeState(OperationState.Idle, TransitionTrigger.Activity);
@@ -142,17 +177,17 @@ namespace FabStack.Core
                 return;
             }
 
-            (Permissive? condition, OperationState next, TimeSpan? timeout, OperationFault fault) step = State switch
+            (bool sequenceDone, Permissive? condition, OperationState next, TimeSpan? timeout, OperationFault? fault) step = State switch
             {
-                OperationState.Aborting => (AbortedCondition, OperationState.Aborted, timeouts.Aborting, OperationFault.AbortingTimeout),
-                OperationState.Homing => (HomedCondition, OperationState.Homed, timeouts.Homing, OperationFault.HomingTimeout),
-                OperationState.Pausing => (PausedCondition, OperationState.Paused, timeouts.Pausing, OperationFault.PausingTimeout),
-                OperationState.Stopping => (StoppedCondition, OperationState.Stopped, timeouts.Stopping, OperationFault.StoppingTimeout),
-                __ => (null, State, null, null)
+                OperationState.Aborting => (abortingRunner.IsCompleted, AbortedCondition, OperationState.Aborted, timeouts.Aborting, OperationFault.AbortingTimeout),
+                OperationState.Homing => (homingRunner.IsCompleted, HomedCondition, OperationState.Homed, timeouts.Homing, OperationFault.HomingTimeout),
+                OperationState.Pausing => (runningRunner.AtBoundary, PausedCondition, OperationState.Paused, timeouts.Pausing, OperationFault.PausingTimeout),
+                OperationState.Stopping => (runningRunner.IsCompleted, StoppedCondition, OperationState.Stopped, timeouts.Stopping, OperationFault.StoppingTimeout),
+                _ => (false, null, State, null, null)
             };
 
             if (step.condition is null) return;
-            else if (step.condition.IsAllowed)
+            else if (step.sequenceDone && step.condition.IsAllowed)
             {
                 ChangeState(step.next, TransitionTrigger.Complete);
                 return;
@@ -161,7 +196,10 @@ namespace FabStack.Core
             if (step.timeout is null) return;      // 감시 안 하는 전이
             else if(timer.ElapsedTime() >= step.timeout && Fault is null)
             {
-                Fault = new Fault(Name, step.fault, $"상태 변경 시간 초과: {step.condition.BlockedReasonsText}");
+                string waiting = step.sequenceDone
+                    ? step.condition.BlockedReasonsText
+                    : $"시퀀스 진행 중({CurrentStep?.Name ?? "스텝 전환 중"})";
+                Fault = new Fault(Name, step.fault.Value, $"상태 변경 시간 초과: {waiting}");
                 return;
             }
         }
