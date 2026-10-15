@@ -33,7 +33,7 @@ namespace FabStack.Core.Tests
                                                 TimeSpan.FromSeconds(180),
                                                 TimeSpan.FromSeconds(10),
                                                 TimeSpan.FromSeconds(60));
-            stateMachine = new OperationStateMachine("Test StateMachine", modeSelector, timeouts, clock, scanCycle);
+            stateMachine = new OperationStateMachine("Test StateMachine", modeSelector, timeouts, OperationSequences.Empty, clock, scanCycle);
         }
         #endregion
 
@@ -229,17 +229,17 @@ namespace FabStack.Core.Tests
 
         #region Tests - 타임아웃과 에러
         [Fact]
-        public void AbortingTimeout_LatchesError_AndStateStays()
+        public void AbortingTimeout_LatchesFault_AndStateStays()
         {
             stateMachine.AbortedCondition.AddCondition(() => abortDone, "정지 미완료");
             stateMachine.Abort();
 
             scanCycle.RunScans(TimeSpan.FromMilliseconds(990));
-            Assert.False(stateMachine.Error);
+            Assert.Null(stateMachine.Fault);
 
             scanCycle.RunScans(TimeSpan.FromMilliseconds(20));
-            Assert.True(stateMachine.Error);
-            Assert.Equal((int)OperationErrorCode.AbortingTimeout, stateMachine.ErrorID);
+            Assert.NotNull(stateMachine.Fault);
+            Assert.Equal<Enum?>(OperationFault.AbortingTimeout, stateMachine.Fault?.Code);
             Assert.Equal(OperationState.Aborting, stateMachine.State);
         }
 
@@ -252,16 +252,16 @@ namespace FabStack.Core.Tests
 
             Assert.True(stateMachine.Abort());              // 재명령은 수용만
             scanCycle.RunScans(TimeSpan.FromMilliseconds(500));
-            Assert.True(stateMachine.Error);                // 처음 Abort 기준 1.1초 → 타임아웃
+            Assert.NotNull(stateMachine.Fault);                // 처음 Abort 기준 1.1초 → 타임아웃
         }
 
         [Fact]
-        public void Error_RejectsNewCommands_ButAbortIsAccepted()
+        public void Fault_RejectsNewCommands_ButAbortIsAccepted()
         {
             stateMachine.AbortedCondition.AddCondition(() => abortDone, "정지 미완료");
             stateMachine.Abort();
             scanCycle.RunScans(TimeSpan.FromMilliseconds(1100));
-            Assert.True(stateMachine.Error);
+            Assert.NotNull(stateMachine.Fault);
 
             abortDone = true;
             scanCycle.RunScans(TimeSpan.FromMilliseconds(20));
@@ -273,26 +273,25 @@ namespace FabStack.Core.Tests
         }
 
         [Fact]
-        public void Reset_ClearsError_AndRestartsTransitionTimer()
+        public void ClearFault_ClearsFault_AndRestartsTransitionTimer()
         {
             stateMachine.AbortedCondition.AddCondition(() => abortDone, "정지 미완료");
             stateMachine.Abort();
             scanCycle.RunScans(TimeSpan.FromMilliseconds(1100));
-            Assert.True(stateMachine.Error);
+            Assert.NotNull(stateMachine.Fault);
 
-            stateMachine.Reset();
-            Assert.False(stateMachine.Error);
-            Assert.Equal(0, stateMachine.ErrorID);
+            stateMachine.ClearFault();
+            Assert.Null(stateMachine.Fault);
 
             scanCycle.RunScans(TimeSpan.FromMilliseconds(500));
-            Assert.False(stateMachine.Error);               // 바로 다시 서지 않는다
+            Assert.Null(stateMachine.Fault);               // 바로 다시 서지 않는다
 
             scanCycle.RunScans(TimeSpan.FromMilliseconds(600));
-            Assert.True(stateMachine.Error);                // Reset 기준 1.1초 → 다시 타임아웃
+            Assert.NotNull(stateMachine.Fault);                // ClearFault 기준 1.1초 → 다시 타임아웃
         }
 
         [Fact]
-        public void HomingTimeout_ThenConditionMet_GoesHomed_ErrorStays_RunRejected()
+        public void HomingTimeout_ThenConditionMet_GoesHomed_FaultStays_RunRejected()
         {
             GoToAborted();
             modeSelector.Change(OperationMode.Maint);
@@ -300,24 +299,24 @@ namespace FabStack.Core.Tests
             stateMachine.Home();
 
             scanCycle.RunScans(TimeSpan.FromSeconds(181));
-            Assert.True(stateMachine.Error);
-            Assert.Equal((int)OperationErrorCode.HomingTimeout, stateMachine.ErrorID);
+            Assert.NotNull(stateMachine.Fault);
+            Assert.Equal<Enum?>(OperationFault.HomingTimeout, stateMachine.Fault?.Code);
 
             homeDone = true;
             scanCycle.RunScans(TimeSpan.FromMilliseconds(20));
             Assert.Equal(OperationState.Homed, stateMachine.State);
-            Assert.True(stateMachine.Error);
+            Assert.NotNull(stateMachine.Fault);
 
             Assert.True(modeSelector.Change(OperationMode.Auto));
             Assert.False(stateMachine.Run());
         }
 
         [Fact]
-        public void NullTimeout_NeverRaisesError()
+        public void NullTimeout_NeverRaisesFault()
         {
             ModeSelector otherMode = new ModeSelector(OperationMode.Manual);
             OperationStateMachine other = new OperationStateMachine("Other", otherMode,
-                new TransitionTimeouts(TimeSpan.FromSeconds(1)), clock, scanCycle);   // Stopping 생략 → null
+                new TransitionTimeouts(TimeSpan.FromSeconds(1)), OperationSequences.Empty, clock, scanCycle);   // Stopping 생략 → null
 
             other.Abort();
             scanCycle.RunScans(TimeSpan.FromMilliseconds(20));
@@ -331,7 +330,7 @@ namespace FabStack.Core.Tests
 
             scanCycle.RunScans(TimeSpan.FromMinutes(10));
             Assert.Equal(OperationState.Stopping, other.State);
-            Assert.False(other.Error);
+            Assert.Null(other.Fault);
         }
         #endregion
 
@@ -368,7 +367,7 @@ namespace FabStack.Core.Tests
         public void ModeChange_RejectedWhileAnyMemberIsRunning()
         {
             OperationStateMachine second = new OperationStateMachine("Second", modeSelector,
-                new TransitionTimeouts(TimeSpan.FromSeconds(1)), clock, scanCycle);
+                new TransitionTimeouts(TimeSpan.FromSeconds(1)), OperationSequences.Empty, clock, scanCycle);
 
             stateMachine.Abort();
             second.Abort();
@@ -390,7 +389,7 @@ namespace FabStack.Core.Tests
         public void ModeChange_IsSharedByAllMembers()
         {
             OperationStateMachine second = new OperationStateMachine("Second", modeSelector,
-                new TransitionTimeouts(TimeSpan.FromSeconds(1)), clock, scanCycle);
+                new TransitionTimeouts(TimeSpan.FromSeconds(1)), OperationSequences.Empty, clock, scanCycle);
 
             stateMachine.Abort();
             second.Abort();

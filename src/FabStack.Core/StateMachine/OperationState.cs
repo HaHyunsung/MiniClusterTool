@@ -19,9 +19,8 @@ namespace FabStack.Core
         Stopped,
         SemiAuto
     }
-    public enum OperationErrorCode
+    public enum OperationFault
     {
-        None = 0,
         AbortingTimeout,
         HomingTimeout,
         PausingTimeout,

@@ -1,11 +1,11 @@
 <Solution>
   <Folder Name="/src/">
-    <Project Path="src/FabStack.Core/FabStack.Core.csproj" />
     <Project Path="src/FabStack.Cluster.App/FabStack.Cluster.App.csproj" />
     <Project Path="src/FabStack.Cluster.Domain/FabStack.Cluster.Domain.csproj" />
     <Project Path="src/FabStack.Cluster.Infrastructure/FabStack.Cluster.Infrastructure.csproj" />
     <Project Path="src/FabStack.Cluster.Simulator/FabStack.Cluster.Simulator.csproj" />
     <Project Path="src/FabStack.Cluster.Ui/FabStack.Cluster.Ui.csproj" />
+    <Project Path="src/FabStack.Core/FabStack.Core.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/FabStack.Core.Tests/FabStack.Core.Tests.csproj" />

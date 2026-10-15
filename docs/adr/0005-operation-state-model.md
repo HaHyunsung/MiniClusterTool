@@ -49,3 +49,10 @@ C#에서는 다음을 바꾼다.
 층 1과 층 2 사이 완료 통보가 한 스캔 늦을 수 있다(등록 순서). 실사용에서 문제되면 다시 본다.
 재검토 조건: PackML의 Suspended(상류/하류 대기)나 Complete(배치 종료) 개념이 필요해지면 상태 추가를 검토한다.
 구현 가이드: docs/guides/01_운전상태모델_구현가이드.md
+
+
+## 개정 (2026-10-10)
+
+층 구분을 바꾼다. 층 1 OperationStateMachine은 상태, 명령 수락, 상태별 시퀀스 실행(SequenceRunner 3개: Aborting/Homing/Running), 완료 판정(시퀀스 완료 AND 등록 Permissive), 이력, 전이 타임아웃을 맡는다. 시퀀스 내용은 생성자의 OperationSequences(Func<IEnumerable<Step>> 3개)로 받는다. 층 2 ModuleBase는 하위 구성(등록, Fault 수집, Abort/ClearFault 전파, 하위 StandStill 완료 조건, 모듈 StandStill, Fault 시 자동 Abort)만 맡는다.
+이유: 명령 수락과 시퀀스 시작이 두 클래스에 나뉘면 모듈이 명령마다 짝을 맞춰야 하고("StateMachine.Abort 직접 호출 금지" 같은 규칙이 생김), 지난 IsCompleted 값이 남는 문제를 명령 안 Start로 땜질해야 했다. 한 곳에 두면 짝이 깨질 수 없다. 상태머신은 시퀀스 내용(장치)을 모르고 상태별로 진행만 하므로 장치 독립은 유지된다.
+결과: "층 1과 층 2 사이 완료 통보가 한 스캔 늦을 수 있다"는 해소된다(실행기 진행과 완료 판정이 같은 Scan). 기존 상태머신 테스트는 OperationSequences.Empty로 동작이 같다.

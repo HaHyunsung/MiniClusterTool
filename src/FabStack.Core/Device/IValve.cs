@@ -9,18 +9,14 @@
         Closed  = 4
     }
 
-    public interface IValve
+    public interface IValve : IFaultSource, IStandStill
     {
         string Name { get; }                // 명칭
-        bool Error { get; }                 // 에러 발생 여부
-        int ErrorID { get; }                // 발생한 에러 ID - 구현 시 Enum으로 선언
         Permissive OpenPermissive { get; }  // Open 동작 전 확인하는 허용 여부
         Permissive ClosePermissive { get; } // Close 동작 전 확인하는 허용 여부
         ValveState State { get; }           // 동작 상태
 
         bool Open();     // Open 명령 - 반환값으로 수행 가능 여부 반환
         bool Close();    // Close 명령 - 반환값으로 수행 가능 여부 반환
-
-        void Reset();
     }
 }

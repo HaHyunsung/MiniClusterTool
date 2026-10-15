@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Text;
 
 namespace FabStack.Core
@@ -8,7 +7,8 @@ namespace FabStack.Core
     public class ModeSelector
     {
         #region Fields
-        private readonly List<OperationStateMachine> members = new();   // 이 모드를 따르는 상태머신들
+        private readonly List<OperationStateMachine> members = new();   // 상태 규칙 대상 (상태머신 생성자가 등록)
+        private readonly List<IStandStill> standStillMembers = new();   // 정지 규칙 대상 (ModuleBase 생성자가 등록)
         #endregion
 
         #region Properties
@@ -21,7 +21,7 @@ namespace FabStack.Core
         #endregion
 
         #region Constructor
-        public ModeSelector(OperationMode initMode)      // AdditionalPermissive = new Permissive(); Current = initMode;
+        public ModeSelector(OperationMode initMode)
         {
             Mode = initMode;
 
@@ -38,7 +38,7 @@ namespace FabStack.Core
                 members.Add(member);
         }
 
-        public bool Change(OperationMode target)               // 고정 규칙 AND AdditionalPermissive 통과 시 변경 후 true
+        public bool Change(OperationMode target)               // 고정 규칙(상태, Maint/Auto는 정지) AND 모드별 Permissive 통과 시 변경
         {
             if (target == Mode) return true;
 
@@ -56,8 +56,16 @@ namespace FabStack.Core
                 : members.All(m => m.State is OperationState.Aborted or OperationState.Homed);
             if (!statesOk) return false;
 
+            if (target != OperationMode.Manual && !standStillMembers.All(m => m.StandStill)) return false;
+
             Mode = target;
             return true;
+        }
+
+        internal void AttachStandStill(IStandStill member)
+        {
+            if (!standStillMembers.Contains(member))
+                standStillMembers.Add(member);
         }
         #endregion
     }

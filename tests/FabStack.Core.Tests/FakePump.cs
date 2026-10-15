@@ -29,10 +29,6 @@
         #region Properties
         public string Name { get; }
 
-        public bool Error { get; private set; }
-
-        public int ErrorID { get; private set; }
-
         public bool RespondsToCommand { get; set; } = true;   // 테스트 중간에 끌 수 있음
 
         public Permissive RunPermissive { get; }
@@ -40,12 +36,19 @@
         public Permissive StopPermissive { get; }
 
         public PumpState State { get; private set; }
+
+        public Fault? Fault { get; private set; }
+
+        public bool StandStill
+        {
+            get => State is not (PumpState.Starting or PumpState.Stopping);
+        }
         #endregion
 
         #region Methods
         public bool Run()
         {
-            if (!RunPermissive.IsAllowed || Error) return false;
+            if (!RunPermissive.IsAllowed || Fault is not null) return false;
             if (State == PumpState.Running || State == PumpState.Starting) return true;
 
             State = PumpState.Starting;
@@ -56,7 +59,7 @@
 
         public bool Stop()
         {
-            if (!StopPermissive.IsAllowed || Error) return false;
+            if (!StopPermissive.IsAllowed || Fault is not null) return false;
             if (State == PumpState.Stopped || State == PumpState.Stopping) return true;
 
             State = PumpState.Stopping;
@@ -67,7 +70,7 @@
 
         private void Scan()
         {
-            if (Error) return;
+            if (Fault is not null) return;
             if (State != PumpState.Starting && State != PumpState.Stopping) return;
 
             TimeSpan elapsed = timer.ElapsedTime();
@@ -83,25 +86,22 @@
             // 2) 타임아웃: 동작 중 상태가 timeout 이상 유지되면 에러 (래칭)
             if (elapsed >= timeoutTime)
             {
-                Error = true;
-                ErrorID = State == PumpState.Starting ? (int)PumpErrorCode.RunTimeout : (int)PumpErrorCode.StopTimeout;
+                Fault = new Fault(Name, State == PumpState.Starting ? PumpFault.RunTimeout : PumpFault.StopTimeout, "응답 없음");
                 State = PumpState.Unknown;
             }
         }
 
-        public void Reset()
+        public void ClearFault()
         {
-            Error = false;
-            ErrorID = 0;
+            Fault = null;
             timer.Stop();
         }
         #endregion
     }
 
-    public enum PumpErrorCode
+    public enum PumpFault
     {
-        NoError = 0,
-        RunTimeout = 1,
-        StopTimeout = 2
+        RunTimeout,
+        StopTimeout
     }
 }
