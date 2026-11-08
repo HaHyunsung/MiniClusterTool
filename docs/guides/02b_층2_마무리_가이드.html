@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>층 2 마무리 가이드 — 테스트 12개와 PR</title>
+<style>
+  :root { --ink:#222; --sub:#666; --line:#e3e3e3; --bg:#fff; --code:#f6f6f6; --mark:#fff6d6; }
+  body { margin:0; font-family: -apple-system, "Segoe UI", "Malgun Gothic", sans-serif; color:var(--ink); background:var(--bg); line-height:1.65; font-size:15px; }
+  main { max-width: 880px; margin: 0 auto; padding: 32px 20px 80px; }
+  h1 { font-size: 24px; margin: 0 0 6px; font-weight: 600; }
+  h2 { font-size: 18px; margin: 40px 0 10px; padding-top: 14px; border-top: 1px solid var(--line); font-weight: 600; }
+  h3 { font-size: 15px; margin: 22px 0 6px; font-weight: 600; }
+  p { margin: 8px 0; }
+  .sub { color: var(--sub); font-size: 13px; }
+  pre { background: var(--code); border: 1px solid var(--line); border-radius: 6px; padding: 12px 14px; overflow-x: auto; font-size: 13px; line-height: 1.5; }
+  code { font-family: Consolas, "D2Coding", monospace; font-size: 13px; background: var(--code); padding: 1px 4px; border-radius: 3px; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; width: 100%; margin: 10px 0; font-size: 14px; }
+  th, td { border: 1px solid var(--line); padding: 7px 10px; text-align: left; vertical-align: top; }
+  th { background: var(--code); font-weight: 600; }
+  .note { background: var(--mark); border-radius: 6px; padding: 10px 14px; margin: 12px 0; }
+  .step { display: flex; gap: 12px; margin: 14px 0; }
+  .step .n { flex: 0 0 28px; height: 28px; border-radius: 50%; background: var(--ink); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 13px; }
+  ol, ul { padding-left: 22px; } li { margin: 4px 0; }
+</style>
+</head>
+<body>
+<main>
+
+<h1>층 2 마무리 가이드 — 테스트 12개와 PR</h1>
+<p class="sub">2026-11-08. 가이드 02의 12절을 지금 코드 기준으로 다시 쓴 것. 이 가이드가 끝나면 feature/module-base가 머지되고 층 2가 닫힌다. 예상 소요 2~3시간.</p>
+
+<h2>0. 순서</h2>
+<ol>
+  <li>복기 15분 — 2절의 흐름표만 읽고 코드 세 곳을 따라간다.</li>
+  <li>SequenceRunnerTest.cs 4개 — 스캔 사이클 없이 Advance를 직접 부른다. 30분.</li>
+  <li>FakeAbortable.cs + ModuleBaseTest.cs 8개 — SampleModule로 시나리오. 1~1.5시간.</li>
+  <li>전체 테스트 실행(기존 25개 + 신규 12개 = 37개) → 커밋 → PR → 머지. 20분.</li>
+</ol>
+<p>막히면 해당 테스트 번호와 지금 상태 값(State, CurrentStep, Fault)을 알려 주면 바로 잡는다. 메서드 본문은 직접 쓴다.</p>
+
+<h2>1. 지금 상태</h2>
+<table>
+<tr><th>항목</th><th>상태</th></tr>
+<tr><td>브랜치</td><td>feature/module-base, 커밋 3개(99e8330, 4acd839, 039cb89) origin까지 푸시됨. PR 전.</td></tr>
+<tr><td>구현</td><td>Fault, IFaultSource/IStandStill/IAbortable, Step, SequenceRunner, OperationSequences, 상태머신 시퀀스 실행, ModuleBase, ModeSelector.AttachStandStill — 전부 들어 있음.</td></tr>
+<tr><td>SampleModule.cs</td><td>tests/FabStack.Core.Tests로 이동 완료.</td></tr>
+<tr><td>커밋 안 된 것</td><td>docs/05_작업_컨텍스트.md 수정분 1개. PR에 같이 넣는다.</td></tr>
+<tr><td>기존 테스트</td><td>FakeValveTest 2 + OperatingStateMachineTest 23. 통과해야 한다(마지막 확인 10/11).</td></tr>
+</table>
+
+<h2>2. 복기 — 한 스캔에서 일어나는 일</h2>
+<p>ModuleBaseTest 생성자 순서대로 만들면 스캔 등록 순서가 밸브 → 상태머신 → 모듈이 된다. 매 스캔 FakeScanCycle이 시계를 10ms 밀고 이 순서로 Scan을 부른다.</p>
+<table>
+<tr><th>순서</th><th>누가</th><th>무엇을</th><th>어디</th></tr>
+<tr><td>1</td><td>FakeValve.Scan</td><td>Opening/Closing이면 경과 시간 확인. workingTime(100ms) 지나면 Opened/Closed. timeoutTime(1s) 지나면 Fault 래칭 + State=Unknown.</td><td>FakeValve.cs</td></tr>
+<tr><td>2</td><td>OperationStateMachine.Scan</td><td>상태에 맞는 실행기 Advance(hold = Pausing/Paused). 돌아온 Fault를 ??=로 래칭. 전이 상태면 "시퀀스 완료 AND Permissive"로 자동 전이. Idle⇄Running은 RunningCondition.</td><td>OperationStateMachine.cs</td></tr>
+<tr><td>3</td><td>ModuleBase.Scan</td><td><code>Fault ??= 하위 첫 Fault ?? 상태머신 Fault</code>. Fault가 있고 상태가 Homing/Idle/Running/Pausing/Stopping/SemiAuto면 AbortOnFault → Abort().</td><td>ModuleBase.cs</td></tr>
+</table>
+<p>SequenceRunner.Advance 한 번의 규칙 세 가지. 테스트 4개가 각각 이 규칙을 찌른다.</p>
+<ul>
+  <li>Current가 null(스텝 사이)이면 다음 스텝을 꺼내고 Action을 한 번 부른다. hold면 꺼내지 않는다. MoveNext가 false면 IsCompleted.</li>
+  <li>꺼낸 스캔이든 진행 중이든 Until을 확인한다. 참이면 Current = null. 그래서 Until이 바로 참인 스텝은 Advance 한 번에 끝난다. 다음 스텝은 다음 Advance에서 꺼낸다.</li>
+  <li>Action이 false거나 Timeout을 넘기면 Fault를 반환하고 Current = null. 실행기는 다음 행동을 정하지 않는다.</li>
+</ul>
+<p class="sub">TwinCAT 비유: Advance = 스텝 FB의 CASE 한 바퀴. Current = null이 "다음 seqNo로 넘어갈 준비가 됨". hold = 그 seqNo에서 멈춰 있는 것.</p>
+
+<h2>3. SequenceRunnerTest.cs (4개)</h2>
+<p>파일 위치 tests/FabStack.Core.Tests/SequenceRunnerTest.cs. 스캔 사이클을 만들지 않는다. <code>FakeClock</code>과 <code>new SequenceRunner("R", clock)</code>만 만들고 Advance를 직접 부른다. 시퀀스는 테스트 클래스의 private 이터레이터 메서드로 둔다.</p>
+<pre><code>public class SequenceRunnerTest
+{
+    #region Fields
+    private readonly FakeClock clock = new();
+    private readonly SequenceRunner runner;
+    private bool done;                 // Until이 읽는 스위치
+    #endregion
+
+    #region Constructor
+    public SequenceRunnerTest() { runner = new SequenceRunner("R", clock); }
+    #endregion
+
+    #region Methods
+    private IEnumerable&lt;Step&gt; TwoSteps()
+    {
+        yield return new Step("A", Until: () =&gt; done);
+        yield return new Step("B");
+    }
+    // 테스트 4개는 아래 표대로
+    #endregion
+}</code></pre>
+
+<table>
+<tr><th>#</th><th>이름(예)</th><th>준비 → 행동 → 검증</th></tr>
+<tr><td>R1</td><td>Advance_ImmediateSteps_OneStepPerAdvance</td>
+<td>done = true. Start(TwoSteps()).<br>Advance(false) → Current null, IsCompleted false (A 꺼내고 바로 끝남).<br>Advance(false) → Current null, IsCompleted false (B).<br>Advance(false) → IsCompleted true, IsActive false.</td></tr>
+<tr><td>R2</td><td>Advance_Hold_FinishesCurrentButDoesNotPullNext</td>
+<td>done = false. Start. Advance(false) → Current.Name == "A".<br>done = true. Advance(true) → Current null, AtBoundary true, IsCompleted false.<br>Advance(true) → 그대로(B를 꺼내지 않음).<br>Advance(false) → B 꺼내고 끝남. Advance(false) → IsCompleted true.</td></tr>
+<tr><td>R3</td><td>Advance_StepTimeout_ReturnsFaultAndEndsStep</td>
+<td>시퀀스: <code>new Step("A", Until: () =&gt; false, Timeout: TimeSpan.FromSeconds(1))</code> 하나.<br>Start. Advance(false) → null. clock.Advance(1s). Advance(false) → Fault 반환.<br>검증: Fault.Code is SequenceFault.StepTimeout, Fault.Source == "R", Fault.Message에 "A" 포함(Assert.Contains), Current null.</td></tr>
+<tr><td>R4</td><td>Advance_ActionRejected_ReturnsFault</td>
+<td>시퀀스: <code>new Step("A", Action: () =&gt; false)</code>.<br>Start. Advance(false) → Fault.Code is SequenceFault.ActionRejected, Current null.</td></tr>
+</table>
+<div class="note">Fault.Code는 Enum 타입이다. 비교는 <code>Assert.Equal(SequenceFault.StepTimeout, fault.Code)</code>로 쓰면 된다(Enum 박싱 비교라 통과한다). Fault가 null일 수 있으니 <code>Assert.NotNull(fault)</code>를 먼저.</div>
+
+<h2>4. FakeAbortable.cs</h2>
+<p>M2 테스트용 대역. tests/FabStack.Core.Tests에 둔다. 가이드 02 10절 그대로.</p>
+<pre><code>public sealed class FakeAbortable : IFaultSource, IStandStill, IAbortable
+{
+    public string Name { get; }
+    public Fault? Fault { get; set; }
+    public bool StandStill { get; set; } = true;
+    public int AbortCount { get; private set; }
+    public int ClearCount { get; private set; }
+
+    public FakeAbortable(string name) =&gt; Name = name;
+    public bool Abort() { AbortCount++; return true; }
+    public void ClearFault() { ClearCount++; Fault = null; }
+}</code></pre>
+
+<h2>5. ModuleBaseTest.cs (8개, SampleModule)</h2>
+<p>생성자. 밸브를 먼저 만들어야 스캔 순서가 2절 표와 같아진다.</p>
+<pre><code>clock     = new FakeClock();
+scanCycle = new FakeScanCycle(clock, TimeSpan.FromMilliseconds(10));
+valve     = new FakeValve("V1", ValveState.Opened, TimeSpan.FromMilliseconds(100), TimeSpan.FromSeconds(1), clock, scanCycle);
+mode      = new ModeSelector(OperationMode.Auto);
+module    = new SampleModule("M1", valve, mode, new TransitionTimeouts(Aborting: TimeSpan.FromSeconds(1)), clock, scanCycle);</code></pre>
+
+<p>시간 계산을 매번 하지 않도록 헬퍼 두 개를 Methods 맨 위에 둔다. 스캔 수를 세는 대신 조건이 참이 될 때까지 돌린다. 실패 시 어디서 멈췄는지 메시지에 남는다.</p>
+<pre><code>private void ToAborted()
+{
+    module.Abort();
+    scanCycle.RunScans(TimeSpan.FromMilliseconds(50));
+    Assert.Equal(OperationState.Aborted, module.State);
+}
+
+private void ToHomed()
+{
+    ToAborted();
+    Assert.True(module.Home());
+    RunUntil(() =&gt; module.State == OperationState.Homed, TimeSpan.FromMilliseconds(500));
+}
+
+private void RunUntil(Func&lt;bool&gt; condition, TimeSpan max)
+{
+    TimeSpan elapsed = TimeSpan.Zero;
+    TimeSpan scan = TimeSpan.FromMilliseconds(10);
+    while (!condition() &amp;&amp; elapsed &lt; max)
+    {
+        scanCycle.RunScans(scan);
+        elapsed += scan;
+    }
+    Assert.True(condition(), $"조건 미충족. State={module.State}, Step={module.CurrentStep?.Name}, Fault={module.Fault}");
+}</code></pre>
+
+<table>
+<tr><th>#</th><th>이름(예)</th><th>준비 → 행동 → 검증</th></tr>
+<tr><td>M1</td><td>Abort_FromNone_ReachesAborted</td>
+<td>module.Abort() → State == Aborting(즉시). RunScans(50ms) → Aborted. Aborting 시퀀스가 비어 있고 밸브가 Opened(StandStill)라 첫 스캔에 끝난다.</td></tr>
+<tr><td>M2</td><td>Abort_PropagatesOnce_ReentryDoesNotPropagate</td>
+<td>fake = new FakeAbortable("F"); module.AddForTest(fake).<br>module.Abort() → fake.AbortCount == 1. 스캔 없이 바로 module.Abort() 다시 → true 반환, AbortCount 여전히 1.</td></tr>
+<tr><td>M3</td><td>Home_ClosesValve_ThenHomedAndStandStill</td>
+<td>ToAborted(). module.Home() true, State == Homing.<br>RunScans(10ms) → CurrentStep!.Name == "밸브 닫기", valve.State == Closing.<br>RunUntil(Homed, 500ms). valve.State == Closed, module.StandStill true, module.CurrentStep null.</td></tr>
+<tr><td>M4</td><td>Home_ValveTimeout_CollectsFaultAndSelfAborts</td>
+<td>ToAborted(). valve.RespondsToCommand = false. module.Home().<br>RunUntil(State == Aborted, 2s). 밸브 타임아웃 1s → 밸브 Fault → 모듈 Scan에서 수집 → 자동 Abort → Aborting → 밸브 Unknown은 StandStill이라 Aborted.<br>검증: module.Fault!.Source == "V1", Fault.Code is ValveFault.CloseTimeout, module.Home() == false.</td></tr>
+<tr><td>M5</td><td>ClearFault_AfterValveTimeout_HomeAccepted</td>
+<td>M4 본문을 그대로 두고 이어서: valve.RespondsToCommand = true(안 돌려 놓으면 또 타임아웃). module.ClearFault() → module.Fault null, valve.Fault null. module.Home() true. RunUntil(Homed, 500ms).</td></tr>
+<tr><td>M6</td><td>Pause_DuringStep_FinishesStepThenPauses_RunResumesNextStep</td>
+<td>ToHomed(). module.Run() true → State == Idle(HasWork false).<br>module.HasWork = true. RunUntil(CurrentStep?.Name == "밸브 열기", 100ms). valve.State == Opening.<br>module.Pause() true → Pausing. RunUntil(Paused, 500ms). 그 사이 밸브는 Opened가 되고 스텝이 끝난 뒤 Paused. valve.State == Opened, CurrentStep null.<br>module.Run() true. RunUntil(CurrentStep?.Name == "밸브 닫기", 100ms). 열기를 다시 하지 않고 닫기부터 이어감.</td></tr>
+<tr><td>M7</td><td>Stop_DuringCycle_FinishesCycleThenStopped</td>
+<td>ToHomed(). Run, HasWork = true. RunUntil(CurrentStep?.Name == "밸브 열기", 100ms).<br>module.Stop() true → Stopping. RunUntil(Stopped, 1s).<br>검증: module.CycleCount == 1(사이클을 끝냈다), valve.State == Closed. HasWork가 true여도 새 사이클을 시작하지 않았다.</td></tr>
+<tr><td>M8</td><td>ModeChange_ToAuto_RejectedWhileValveMoving</td>
+<td>생성자의 Auto 모드로는 "Auto로 변경"이 같은 모드라 true가 나온다. 이 테스트 안에서만: ToAborted(). mode.Change(OperationMode.Manual) true.<br>valve.Close() true → Closing(동작 중). mode.Change(Auto) false, mode.Change(Maint) false, mode.Change(Manual) true(같은 모드).<br>RunUntil(valve.State == Closed, 200ms). mode.Change(Auto) true.</td></tr>
+</table>
+
+<div class="note">
+M6, M7에서 "밸브 열기"가 잡히는 타이밍: Run 뒤 HasWork = true로 두면 다음 스캔에 Idle → Running(Activity), 그 스캔 또는 다음 스캔에 "일감 대기"가 바로 끝나고, 그다음 스캔에 "밸브 열기"를 꺼낸다. 스캔 수를 세지 말고 RunUntil로 잡는다. 100ms(스캔 10번) 안에 안 잡히면 상태머신 Scan의 Idle→Running 처리 쪽을 본다.
+</div>
+
+<h2>6. 실행과 PR</h2>
+<div class="step"><div class="n">1</div><div>테스트 탐색기에서 필터를 "모두"로 두고 전체 실행. 37개 통과 확인. 실패하면 테스트 번호와 Assert 메시지(RunUntil이 State/Step/Fault를 찍어 준다)를 보내 준다.</div></div>
+<div class="step"><div class="n">2</div><div>커밋 2개. <code>test: SequenceRunner 테스트 4개 추가</code>, <code>test: ModuleBase 시나리오 테스트 8개 및 FakeAbortable 추가</code>. docs/05 수정분은 두 번째에 같이 넣거나 <code>docs: 작업 컨텍스트 갱신</code>으로 따로.</div></div>
+<div class="step"><div class="n">3</div><div>푸시 후 PR. 제목 <code>feat: 층 2 모듈 베이스(Fault, 시퀀스 실행기, ModuleBase)</code>. 본문 3줄 이상 — 무엇을(기능 인터페이스 3개, Step/SequenceRunner, 상태머신 시퀀스 실행, ModuleBase), 왜 이렇게(int 에러 코드 대신 Fault record, seqNo CASE 대신 이터레이터, 실행기는 상태머신 안), 검증(테스트 37개). 변경량이 400줄을 넘지만 커밋 3개가 이미 올라가 있어 이번은 하나로 간다. 다음 층부터 PR을 더 잘게.</div></div>
+<div class="step"><div class="n">4</div><div>머지 후 master 체크아웃·풀. 머지되면 알려 주면 03_진행_상황과 05_작업_컨텍스트를 내가 갱신한다.</div></div>
+
+<h2>7. 다음 — 가이드 03</h2>
+<p>챔버(진공 속성: 압력, 펌핑/벤팅 스텝)와 LoadLock 모듈. FabStack.Cluster.Domain에 들어가고, SampleModule과 같은 모양으로 Homing/Running을 쓴다. 펌핑은 "러핑 밸브 열기 → 목표 압력 도달(Timeout) → 밸브 닫기". LoadLock 펌핑/벤팅 테스트에 밸브 무응답·압력 도달 실패가 들어가면 사양서 2~3주차 완료다. 머지 확인되면 바로 쓴다.</p>
+
+</main>
+</body>
+</html>
